@@ -8,10 +8,24 @@ type CountdownRingProps = {
   color: string;
   strokeWidth?: number;
   fontSize?: number;
+  /**
+   * Chave do período TOTP (ex.: totpCounter(now)). Remonta o arco a cada
+   * período para o anel "encher" instantaneamente em vez de animar ao
+   * contrário; dentro do período o esvaziamento é suavizado por transição.
+   */
+  periodKey?: number | string;
 };
 
 /** Anel de contagem TOTP: esvazia conforme o tempo (stroke-dashoffset proporcional). */
-export function CountdownRing({ size, frac, remaining, color, strokeWidth = 3, fontSize = 12 }: CountdownRingProps) {
+export function CountdownRing({
+  size,
+  frac,
+  remaining,
+  color,
+  strokeWidth = 3,
+  fontSize = 12,
+  periodKey,
+}: CountdownRingProps) {
   const r = size / 2 - strokeWidth - 0.5;
   const c = size / 2;
   const circumference = 2 * Math.PI * r;
@@ -21,6 +35,7 @@ export function CountdownRing({ size, frac, remaining, color, strokeWidth = 3, f
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,.1)" strokeWidth={strokeWidth} />
         <circle
+          key={periodKey}
           cx={c}
           cy={c}
           r={r}
@@ -31,6 +46,7 @@ export function CountdownRing({ size, frac, remaining, color, strokeWidth = 3, f
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           transform={`rotate(-90 ${c} ${c})`}
+          style={{ transition: 'stroke-dashoffset 0.26s linear, stroke 0.3s ease' }}
         />
       </svg>
       <div
@@ -43,6 +59,7 @@ export function CountdownRing({ size, frac, remaining, color, strokeWidth = 3, f
           fontSize,
           fontWeight: 700,
           color,
+          transition: 'color 0.3s ease',
         }}
       >
         {remaining}

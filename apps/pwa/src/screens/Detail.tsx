@@ -11,29 +11,33 @@ import {
   IconShare,
   ringColor,
 } from '@aegis/ui';
-import { AVATAR_STYLES, strengthMeta } from '@aegis/core';
+import { avatarFor, estimateStrength, strengthMeta, totpCounter } from '@aegis/core';
 import { useApp } from '../store';
 import { useNow, useTotp } from '../hooks';
 
 export function Detail() {
-  const { vault, detailId, back, revealed, toggleReveal, copy } = useApp();
-  const item = vault.credentials.find((c) => c.id === detailId);
+  const { vault, detailId, back, revealed, toggleReveal, copy, share, openEdit, deleteCredential } = useApp();
+  const item = vault?.credentials.find((c) => c.id === detailId);
   const now = useNow(!!item?.totpSecret);
   const totp = useTotp(item?.totpSecret, now);
 
   if (!item) return null;
 
-  const meta = strengthMeta(item.strength);
-  const avatar = AVATAR_STYLES[item.id] ?? { color: 'var(--accent-grad)', initial: item.name[0] };
+  const meta = strengthMeta(estimateStrength(item.password));
+  const avatar = avatarFor(item.id, item.name);
   const color = ringColor(totp.remaining);
 
+  const removeItem = () => {
+    if (window.confirm(`Excluir "${item.name}" do cofre?`)) deleteCredential(item.id);
+  };
+
   return (
-    <div className="screen screen--scroll">
+    <div className="screen screen--scroll screen--slide">
       <div className="detail-nav">
         <button type="button" className="icon-btn" onClick={back} aria-label="Voltar">
           <IconChevronLeft size={19} />
         </button>
-        <button type="button" className="icon-btn" aria-label="Mais opções">
+        <button type="button" className="icon-btn" onClick={removeItem} aria-label="Excluir item">
           <IconKebab size={18} />
         </button>
       </div>
@@ -104,7 +108,7 @@ export function Detail() {
           </div>
         </div>
 
-        {item.has2fa && item.totpSecret && (
+        {item.totpSecret && (
           <button
             type="button"
             className="totp-card"
@@ -119,16 +123,29 @@ export function Detail() {
                 <div className="totp-card-code">{totp.code}</div>
               </div>
             </div>
-            <CountdownRing size={34} frac={totp.frac} remaining={totp.remaining} color={color} />
+            <CountdownRing
+              size={34}
+              frac={totp.frac}
+              remaining={totp.remaining}
+              color={color}
+              periodKey={totpCounter(now)}
+            />
           </button>
         )}
 
+        {item.notes && (
+          <div className="field-card">
+            <div className="field-label">Notas</div>
+            <div className="field-value" style={{ whiteSpace: 'pre-wrap' }}>{item.notes}</div>
+          </div>
+        )}
+
         <div className="detail-actions">
-          <button type="button" className="action-btn">
+          <button type="button" className="action-btn" onClick={() => openEdit(item.id)}>
             <IconEdit size={17} />
             Editar
           </button>
-          <button type="button" className="action-btn">
+          <button type="button" className="action-btn" onClick={() => share(item)}>
             <IconShare size={17} />
             Compartilhar
           </button>

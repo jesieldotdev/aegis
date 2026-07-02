@@ -5,7 +5,7 @@ type ToggleProps = {
   variant?: 'accent' | 'success';
 };
 
-/** Toggle 46×28px, knob branco 22px; track ativo em gradiente. */
+/** Toggle 46×28px, knob branco 22px animado; track ativo em gradiente. */
 export function Toggle({ on, onToggle, variant = 'accent' }: ToggleProps) {
   const activeTrack =
     variant === 'success'
@@ -25,9 +25,8 @@ export function Toggle({ on, onToggle, variant = 'accent' }: ToggleProps) {
         border: 'none',
         cursor: 'pointer',
         background: on ? activeTrack : 'rgba(255,255,255,.1)',
-        transition: 'background .2s',
+        transition: 'background .25s ease',
         display: 'flex',
-        justifyContent: on ? 'flex-end' : 'flex-start',
         flex: '0 0 auto',
       }}
     >
@@ -38,6 +37,8 @@ export function Toggle({ on, onToggle, variant = 'accent' }: ToggleProps) {
           borderRadius: '50%',
           background: '#fff',
           boxShadow: '0 2px 5px rgba(0,0,0,.3)',
+          transform: on ? 'translateX(18px)' : 'translateX(0)',
+          transition: 'transform .25s cubic-bezier(.2,.8,.2,1.1)',
         }}
       />
     </button>

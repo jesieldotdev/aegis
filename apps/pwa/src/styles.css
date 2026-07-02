@@ -55,10 +55,41 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: aeg-screen 0.28s ease both;
 }
 
 .screen--scroll {
   overflow-y: auto;
+}
+
+/* Detalhe/edição empurram da direita, como navegação nativa */
+.screen--slide {
+  animation: aeg-slide 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes aeg-screen {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes aeg-slide {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+}
+
+.app-body {
+  animation: aeg-unlock 0.4s ease both;
+}
+
+@keyframes aeg-unlock {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
 }
 
 .screen-header {
@@ -315,12 +346,18 @@ button {
   border-radius: 16px;
   cursor: pointer;
   margin-bottom: 4px;
-  transition: background 0.18s;
+  transition: background 0.18s, transform 0.15s ease;
   width: 100%;
   background: none;
   border: none;
   color: inherit;
   text-align: left;
+  animation: aeg-pop 0.22s both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+
+.vault-item:active {
+  transform: scale(0.98);
 }
 
 .vault-item:hover {
@@ -589,6 +626,17 @@ button {
   width: 100%;
   color: inherit;
   text-align: left;
+  animation: aeg-pop 0.22s both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+  transition: transform 0.15s ease;
+}
+
+.token-card:active {
+  transform: scale(0.98);
+}
+
+.token-code {
+  transition: color 0.3s ease;
 }
 
 .token-body {
@@ -994,4 +1042,317 @@ button {
   font-size: 14px;
   font-weight: 600;
   color: #f2f2f6;
+}
+
+/* ===== Onboarding / formulários ===== */
+.onboarding {
+  justify-content: flex-start;
+  padding-top: 80px;
+  overflow-y: auto;
+}
+
+.ob-form {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.ob-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ob-input {
+  display: block;
+  width: 100%;
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 15px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.ob-input:focus-within,
+.ob-input:focus {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: rgba(167, 139, 250, 0.07);
+}
+
+.ob-input--row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 15px;
+}
+
+.ob-input--row input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 15px;
+  font-family: var(--font-body);
+  padding: 5px 0;
+}
+
+.ob-eye {
+  background: none;
+  border: none;
+  color: #9a9aad;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+}
+
+.ob-strength {
+  display: flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.ob-demo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.ob-demo input {
+  accent-color: var(--accent-500);
+  width: 16px;
+  height: 16px;
+}
+
+.ob-error {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger);
+  animation: aeg-pop 0.2s both;
+}
+
+.ob-submit {
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  background: var(--accent-grad);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  box-shadow: 0 6px 18px var(--accent-glow);
+  margin-top: 4px;
+}
+
+.ob-submit:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* ===== Lock: senha-mestra ===== */
+.lock-form {
+  margin-top: 44px;
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.lock-form .ob-input--row {
+  width: 100%;
+}
+
+.lock-go {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent-grad);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.lock-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lock-alt {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 14px;
+  font-family: var(--font-body);
+}
+
+.lock-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.lock-hint--busy {
+  color: var(--accent);
+  animation: aeg-pulse 1.2s ease-in-out infinite;
+}
+
+/* ===== Edição de item ===== */
+.ed-input {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f2f2f6;
+  font-size: 15.5px;
+  font-family: var(--font-body);
+  padding: 0;
+}
+
+.ed-input::placeholder {
+  color: #5c5c6c;
+}
+
+.ed-input--mono {
+  font-family: var(--font-mono);
+  font-size: 14.5px;
+  letter-spacing: 0.5px;
+}
+
+.ed-textarea {
+  resize: vertical;
+  min-height: 40px;
+}
+
+.ed-pass-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.ed-pass-row .ed-input {
+  margin-top: 0;
+  flex: 1;
+}
+
+.ed-cats {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.action-btn--primary {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 6px 18px var(--accent-glow);
+}
+
+/* ===== Leitor de QR ===== */
+.qr-video-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qr-video {
+  width: 100%;
+  border-radius: 18px;
+  border: 1.5px solid rgba(167, 139, 250, 0.35);
+  background: #000;
+  aspect-ratio: 1;
+  object-fit: cover;
+  animation: aeg-pop 0.25s both;
+}
+
+.tk-remove {
+  background: rgba(251, 113, 133, 0.1);
+  border: 1px solid rgba(251, 113, 133, 0.25);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  flex: 0 0 auto;
+}
+
+/* ===== Feedback de toque ===== */
+.icon-btn,
+.mini-btn,
+.action-btn,
+.gen-btn,
+.folder-chip,
+.auth-scan,
+.set-lock-btn,
+.ob-submit,
+.lock-go,
+.tabbar-item,
+.totp-card {
+  transition: transform 0.15s ease, background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.icon-btn:active,
+.mini-btn:active,
+.action-btn:active,
+.gen-btn:active,
+.folder-chip:active,
+.auth-scan:active,
+.set-lock-btn:active,
+.ob-submit:active,
+.lock-go:active,
+.totp-card:active {
+  transform: scale(0.96);
+}
+
+.tabbar-item:active {
+  transform: scale(0.92);
+}
+
+.field-card,
+.set-account,
+.set-group,
+.gen-display,
+.gen-card,
+.gen-toggles,
+.gen-mode {
+  animation: aeg-pop 0.24s both;
+}
+
+/* ===== Acessibilidade ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

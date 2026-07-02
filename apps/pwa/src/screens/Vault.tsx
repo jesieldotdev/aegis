@@ -1,12 +1,13 @@
+import type { CSSProperties } from 'react';
 import {
   Avatar,
   IconChevronRight,
   IconClock,
-  IconFilter,
   IconKey,
+  IconQrPlus,
   IconSearch,
 } from '@aegis/ui';
-import { AVATAR_STYLES, strengthMeta } from '@aegis/core';
+import { avatarFor, estimateStrength, strengthMeta } from '@aegis/core';
 import { useApp, type Folder } from '../store';
 
 const FOLDERS: { id: Folder; dot: string }[] = [
@@ -17,9 +18,12 @@ const FOLDERS: { id: Folder; dot: string }[] = [
 ];
 
 export function Vault() {
-  const { vault, user, folder, setFolder, search, setSearch, openDetail } = useApp();
-  const { credentials } = vault;
+  const { vault, folder, setFolder, search, setSearch, openDetail, openEdit } = useApp();
+  if (!vault) return null;
+  const { credentials, profile } = vault;
 
+  const firstName = profile.name.split(/\s+/)[0] || 'Você';
+  const initial = (profile.name[0] || 'A').toUpperCase();
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
@@ -38,15 +42,15 @@ export function Vault() {
       <div className="vault-header">
         <div>
           <div className="vault-greeting">
-            {greeting}, {user.firstName}
+            {greeting}, {firstName}
           </div>
           <div className="screen-title">Cofre</div>
         </div>
         <div className="vault-header-actions">
-          <button type="button" className="icon-btn" aria-label="Filtrar">
-            <IconFilter size={19} />
+          <button type="button" className="icon-btn" aria-label="Adicionar item" onClick={() => openEdit(null)}>
+            <IconQrPlus size={19} />
           </button>
-          <div className="vault-avatar">{user.initial}</div>
+          <div className="vault-avatar">{initial}</div>
         </div>
       </div>
 
@@ -82,11 +86,17 @@ export function Vault() {
       </div>
 
       <div className="vault-list">
-        {filtered.map((c) => {
-          const meta = strengthMeta(c.strength);
-          const avatar = AVATAR_STYLES[c.id] ?? { color: 'var(--accent-grad)', initial: c.name[0] };
+        {filtered.map((c, i) => {
+          const meta = strengthMeta(estimateStrength(c.password));
+          const avatar = avatarFor(c.id, c.name);
           return (
-            <button type="button" key={c.id} className="vault-item" onClick={() => openDetail(c.id)}>
+            <button
+              type="button"
+              key={c.id}
+              className="vault-item"
+              style={{ '--i': i } as CSSProperties}
+              onClick={() => openDetail(c.id)}
+            >
               <Avatar color={avatar.color} initial={avatar.initial} />
               <div className="vault-item-body">
                 <div className="vault-item-title">
@@ -101,14 +111,18 @@ export function Vault() {
                 <div className="vault-item-user">{c.username}</div>
               </div>
               <div className="vault-item-meta">
-                {c.has2fa && <IconClock size={16} style={{ color: 'var(--info-2fa)' }} />}
+                {c.totpSecret && <IconClock size={16} style={{ color: 'var(--info-2fa)' }} />}
                 <span className="strength-dot" style={{ background: meta.color }} title={meta.label} />
                 <IconChevronRight size={17} />
               </div>
             </button>
           );
         })}
-        {filtered.length === 0 && <div className="vault-empty">Nenhum item encontrado</div>}
+        {filtered.length === 0 && (
+          <div className="vault-empty">
+            {credentials.length === 0 ? 'Cofre vazio — toque em + para adicionar' : 'Nenhum item encontrado'}
+          </div>
+        )}
       </div>
     </div>
   );

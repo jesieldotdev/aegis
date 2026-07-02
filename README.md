@@ -55,12 +55,22 @@ npm run build
 
 | Tela | Descrição |
 | --- | --- |
-| **Bloqueio** | Desbloqueio biométrico (WebAuthn quando disponível; animação de varredura) |
-| **Cofre** | Busca, pastas (Todos/Pessoal/Trabalho/Financeiro), badges PASSKEY, indicador 2FA e força |
-| **Detalhe** | Copiar usuário/senha, revelar senha, barras de força, código 2FA vinculado com anel de 30s |
-| **Autenticador** | Códigos TOTP ao vivo, anel de contagem regressiva (roxo → amarelo → vermelho) |
+| **Onboarding** | Primeira execução: cria o cofre e define a senha-mestra (opção de dados de exemplo) |
+| **Bloqueio** | Senha-mestra sempre; biometria (WebAuthn) como atalho quando ativada |
+| **Cofre** | Busca, pastas (Todos/Pessoal/Trabalho/Financeiro), badges PASSKEY, indicador 2FA e força, botão + para novos itens |
+| **Detalhe** | Copiar usuário/senha, revelar senha, força derivada da senha real, código 2FA com anel de 30s, editar/compartilhar/excluir |
+| **Novo/Editar item** | Nome, domínio, usuário, senha (com gerador embutido), pasta, segredo 2FA (base32 ou `otpauth://`), notas |
+| **Autenticador** | Códigos TOTP ao vivo; adicionar token por QR Code (câmera) ou entrada manual; remover tokens |
 | **Gerador** | Modos caracteres/palavras, comprimento 8–40, toggles de conjuntos, força colorida |
-| **Ajustes** | Conta Google, biometria, bloqueio automático (1 min), backup, exportar `.aegis`, bloquear cofre |
+| **Ajustes** | Biometria real (WebAuthn), bloqueio automático (1/5/15 min), exportar/importar `.aegis`, bloquear cofre |
+
+## Persistência (sem backend)
+
+O cofre é gravado em `localStorage` **sempre cifrado** (AES-256-GCM). A chave é derivada
+da senha-mestra via PBKDF2 e existe apenas em memória enquanto o app está desbloqueado —
+recarregar a página exige desbloquear de novo. Para o desbloqueio biométrico, a chave do
+cofre é embrulhada (`wrapKey`) por uma chave de dispositivo não-extraível no IndexedDB e
+só é desembrulhada após uma asserção WebAuthn com `userVerification: required`.
 
 ## Segurança
 
@@ -70,7 +80,7 @@ npm run build
 - **Gerador**: CSPRNG (`crypto.getRandomValues`) com rejection sampling (sem viés de módulo) e garantia de ao menos um caractere por conjunto ativo.
 - **Autofill**: o content script casa o domínio da página com as entradas do cofre e preenche apenas no documento principal, via eventos de input nativos.
 
-> **Nota (demo):** sem backend, o cofre usa dados de exemplo em memória (`packages/core/src/demo.ts`). Em produção: cofre persistido cifrado, Argon2id no lugar de PBKDF2, login Google (OIDC) para sincronização e unwrap da chave condicionado à asserção WebAuthn (PRF/largeBlob).
+> **Nota:** a extensão Chrome ainda usa os dados de exemplo (sincronização real com o cofre da PWA exigiria backend ou import do `.aegis` na extensão). Próximos passos naturais: Argon2id no lugar de PBKDF2, login Google (OIDC) para sincronização e unwrap da chave condicionado criptograficamente à asserção WebAuthn (PRF/largeBlob).
 
 ## Design
 

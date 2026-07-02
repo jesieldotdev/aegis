@@ -1,4 +1,4 @@
-import type { Strength } from './types';
+export type Strength = 'strong' | 'medium' | 'weak';
 
 export type StrengthMeta = {
   color: string;

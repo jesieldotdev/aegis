@@ -60,6 +60,7 @@ function TokenRow({ id, issuer, secret, now }: { id: string; issuer: string; sec
   }, [secret, counter]);
   const remaining = totpRemaining(now);
   const avatar = AVATAR_STYLES[id] ?? { color: 'var(--accent-grad)', initial: issuer[0] };
+  const periodKey = totpCounter(now);
 
   return (
     <button
@@ -73,7 +74,14 @@ function TokenRow({ id, issuer, secret, now }: { id: string; issuer: string; sec
         <div className="pop-token-issuer">{issuer}</div>
         <div className="pop-token-code">{code}</div>
       </div>
-      <CountdownRing size={30} frac={remaining / TOTP_PERIOD} remaining={remaining} color={ringColor(remaining)} fontSize={10} />
+      <CountdownRing
+        size={30}
+        frac={remaining / TOTP_PERIOD}
+        remaining={remaining}
+        color={ringColor(remaining)}
+        fontSize={10}
+        periodKey={periodKey}
+      />
     </button>
   );
 }
