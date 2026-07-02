@@ -17,15 +17,17 @@ aegis/
 │  │  ├─ totp.ts            # TOTP RFC 6238 (HMAC-SHA1, 30s, 6 dígitos) via WebCrypto
 │  │  ├─ generator.ts       # gerador de senha/passphrase com crypto.getRandomValues
 │  │  ├─ crypto.ts          # AES-256-GCM + PBKDF2-SHA256 (600k iterações)
+│  │  ├─ drive.ts           # camada REST do Google Drive (appDataFolder) — só ciphertext
+│  │  ├─ sync.ts            # merge por item (updatedAt + tombstones), determinístico
 │  │  ├─ backup.ts          # export/import de arquivo .aegis criptografado
 │  │  ├─ webauthn.ts        # desbloqueio biométrico (WebAuthn / Passkeys)
 │  │  ├─ strength.ts        # classificação de força de senha
 │  │  ├─ base32.ts          # RFC 4648 (segredos TOTP)
-│  │  └─ demo.ts            # dados de demonstração (sem backend)
+│  │  └─ demo.ts            # dados de demonstração (opcional no onboarding)
 │  └─ ui/                   # design tokens + componentes React compartilhados
 ├─ apps/
-│  ├─ pwa/                  # app mobile (manifest, service worker, 6 telas)
-│  └─ extension/            # extensão Chrome MV3 (popup + content script de autofill)
+│  ├─ pwa/                  # app mobile (manifest, service worker, 6 telas, sync Drive)
+│  └─ extension/            # extensão Chrome MV3 (popup + content script + pull do Drive)
 ```
 
 ## Rodando
@@ -45,11 +47,14 @@ npm run build
 1. `npm run build:extension` — gera `apps/extension/dist/`
 2. Abra `chrome://extensions`, ative o **Modo do desenvolvedor**
 3. **Carregar sem compactação** → selecione `apps/extension/dist`
-4. Para testar o autofill, sirva a página demo:
+4. No popup: **Conectar com Google** baixa o cofre cifrado do Drive → digite a **senha-mestra** para desbloquear. A partir daí o popup mostra as contas da página, o gerador e os códigos 2FA reais.
+5. Para testar o autofill, sirva a página demo **por HTTP** (content scripts não rodam em `file://`):
    ```bash
-   npx serve apps/extension/demo
+   npx serve apps/extension/demo   # abra http://localhost:3000/acmebank.html
    ```
-   e abra `acmebank.html` — o dropdown "AEGIS · 1 conta para acmebank.com.br" aparece sob o campo de e-mail. O popup da toolbar mostra as contas da página, o gerador e os códigos 2FA ao vivo.
+   Com o cofre desbloqueado, o dropdown "AEGIS · N contas para <domínio>" aparece sob o campo de e-mail.
+
+> A extensão só **puxa** o cofre do Drive (leitura); a edição continua no app PWA. O cofre decifrado vive em `chrome.storage.session` (some ao fechar o navegador) e é liberado ao content script para o autofill — "Bloquear" no popup limpa a sessão na hora.
 
 ## Telas (PWA)
 
@@ -92,6 +97,13 @@ e após cada alteração (debounced).
    habilite a **Google Drive API** e adicione a origem do app em "Authorized JavaScript origins".
 2. Copie `apps/pwa/.env.example` para `apps/pwa/.env` e preencha `VITE_GOOGLE_CLIENT_ID`.
 3. Sem essa variável o app funciona 100% offline — a opção de conectar aparece desabilitada com a devida indicação.
+
+**Para a extensão** (mesmo Client ID Web): o Chrome usa o redirect
+`https://<extension-id>.chromiumapp.org/`. Descubra o `<extension-id>` em
+`chrome://extensions` (com a extensão carregada) e adicione essa URL em
+"Authorized redirect URIs" do OAuth Client. Defina `VITE_GOOGLE_CLIENT_ID`
+também para o build da extensão (`apps/extension/.env`). Para um id estável
+entre reinstalações, fixe uma `key` no `manifest.json`.
 
 ## Segurança
 

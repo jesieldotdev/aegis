@@ -5,9 +5,21 @@
  * Segurança: preenche apenas via eventos de input no documento principal —
  * nunca injeta segredos em iframes de terceiros; o casamento é por origem.
  */
-import { AVATAR_STYLES, DEMO_CREDENTIALS, type Credential } from '@aegis/core';
+import { avatarFor, type Credential, type Vault } from '@aegis/core';
 
 const PREFIX = 'aegis-ext';
+const SESSION_VAULT_KEY = 'aegis.vault';
+
+/** Lê o cofre decifrado da sessão (só existe enquanto desbloqueado na popup). */
+async function loadVault(): Promise<Vault | null> {
+  if (typeof chrome === 'undefined' || !chrome.storage?.session) return null;
+  try {
+    const r = await chrome.storage.session.get(SESSION_VAULT_KEY);
+    return (r[SESSION_VAULT_KEY] as Vault | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const SHIELD_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 3l6.5 2.8v4.8c0 4-2.7 7.3-6.5 8.6-3.8-1.3-6.5-4.6-6.5-8.6V5.8L12 3z" fill="#fff" fill-opacity=".2" stroke="#fff" stroke-width="1.8"/></svg>`;
 
@@ -16,10 +28,10 @@ function pageDomain(): string {
   return document.body?.dataset.aegisDemo || location.hostname.replace(/^www\./, '');
 }
 
-function credentialsForDomain(domain: string): Credential[] {
+function credentialsForDomain(creds: Credential[], domain: string): Credential[] {
   if (!domain) return [];
   const h = domain.toLowerCase();
-  return DEMO_CREDENTIALS.filter((c) => {
+  return creds.filter((c) => {
     const d = c.domain.toLowerCase();
     return d === h || d.endsWith(`.${h}`) || h.endsWith(`.${d}`) || d.split('.').slice(-2).join('.') === h;
   });
@@ -138,10 +150,8 @@ function fillCredential(cred: Credential) {
 }
 
 function avatarStyle(cred: Credential): { background: string; initial: string } {
-  const style = AVATAR_STYLES[cred.id];
-  return style
-    ? { background: style.color, initial: style.initial }
-    : { background: 'linear-gradient(145deg,#2563eb,#1e40af)', initial: cred.name[0]!.toUpperCase() };
+  const { color, initial } = avatarFor(cred.id, cred.name);
+  return { background: color, initial };
 }
 
 function showDropdown(anchor: HTMLInputElement, creds: Credential[], domain: string) {
@@ -209,17 +219,29 @@ function addPasswordBadge(pass: HTMLInputElement) {
   window.addEventListener('scroll', position, true);
 }
 
-function init() {
+async function init() {
   const fields = findLoginFields();
   if (!fields) return;
+  const vault = await loadVault();
+  if (!vault) return; // cofre bloqueado ou não conectado — sem autofill
   const domain = pageDomain();
-  const creds = credentialsForDomain(domain);
+  const creds = credentialsForDomain(vault.credentials, domain);
   if (creds.length === 0) return;
 
   injectStyles();
   addPasswordBadge(fields.pass);
   showDropdown(fields.user, creds, domain);
   fields.user.addEventListener('focus', () => showDropdown(fields.user, creds, domain));
+}
+
+// Reage ao desbloquear/bloquear na popup: (re)avalia o autofill na hora.
+if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'session' && SESSION_VAULT_KEY in changes) {
+      removeDropdown();
+      void init();
+    }
+  });
 }
 
 // Preenchimento disparado pelo popup da toolbar

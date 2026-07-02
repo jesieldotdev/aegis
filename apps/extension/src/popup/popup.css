@@ -35,6 +35,126 @@ body {
   box-shadow: 0 0 7px var(--success);
 }
 
+.pop-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: var(--surface-2);
+  color: #c1c1cf;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pop-icon:first-of-type {
+  margin-left: auto;
+}
+
+.pop-icon--spin {
+  animation: aeg-spin 0.9s linear infinite;
+}
+
+@keyframes aeg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== Gate (lock / connect) ===== */
+.pop-gate {
+  padding: 22px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pop-gate-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.pop-gate-sub {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.pop-gate-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 9px 9px 12px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 6px;
+}
+
+.pop-gate-field input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: var(--font-body);
+}
+
+.pop-gate-go {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent-grad);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.pop-gate-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pop-connect {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 11px;
+  border: none;
+  background: var(--accent-grad);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  box-shadow: 0 6px 18px var(--accent-glow);
+}
+
+.pop-connect:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pop-gate-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.pop-gate-error {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
 .pop-body {
   padding: 12px;
 }

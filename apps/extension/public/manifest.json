@@ -7,6 +7,10 @@
     "default_popup": "popup.html",
     "default_title": "Aegis"
   },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
@@ -14,6 +18,6 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["activeTab", "clipboardWrite"],
-  "host_permissions": []
+  "permissions": ["activeTab", "clipboardWrite", "identity", "storage"],
+  "host_permissions": ["https://www.googleapis.com/*"]
 }

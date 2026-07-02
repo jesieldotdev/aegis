@@ -1,6 +1,8 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
+// Content script: declarado no manifest como script clássico (não-módulo),
+// então precisa ser um bundle IIFE autossuficiente, sem imports em runtime.
 export default defineConfig({
   build: {
     outDir: 'dist',

@@ -6,6 +6,7 @@ export * from './otpauth';
 export * from './generator';
 export * from './strength';
 export * from './crypto';
+export * from './drive';
 export * from './backup';
 export * from './webauthn';
 export * from './avatar';
