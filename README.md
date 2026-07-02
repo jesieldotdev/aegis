@@ -64,13 +64,34 @@ npm run build
 | **Gerador** | Modos caracteres/palavras, comprimento 8–40, toggles de conjuntos, força colorida |
 | **Ajustes** | Biometria real (WebAuthn), bloqueio automático (1/5/15 min), exportar/importar `.aegis`, bloquear cofre |
 
-## Persistência (sem backend)
+## Persistência e sincronização
 
-O cofre é gravado em `localStorage` **sempre cifrado** (AES-256-GCM). A chave é derivada
-da senha-mestra via PBKDF2 e existe apenas em memória enquanto o app está desbloqueado —
-recarregar a página exige desbloquear de novo. Para o desbloqueio biométrico, a chave do
-cofre é embrulhada (`wrapKey`) por uma chave de dispositivo não-extraível no IndexedDB e
-só é desembrulhada após uma asserção WebAuthn com `userVerification: required`.
+**Local:** o cofre é gravado em `localStorage` **sempre cifrado** (AES-256-GCM). A chave é
+derivada da senha-mestra via PBKDF2 e existe apenas em memória enquanto o app está
+desbloqueado — recarregar a página exige desbloquear de novo. Para o desbloqueio
+biométrico, a chave do cofre é embrulhada (`wrapKey`) por uma chave de dispositivo
+não-extraível no IndexedDB e só é desembrulhada após uma asserção WebAuthn com
+`userVerification: required`.
+
+**Nuvem (Google Drive):** conectando a conta Google (Ajustes → Sincronização na nuvem), o
+**mesmo envelope cifrado** é gravado na pasta oculta `appDataFolder` do Drive do usuário —
+por-app, por-usuário, invisível no Drive normal. O Google só enxerga ciphertext; a chave de
+descriptografia nunca sai do dispositivo. OAuth (Google Identity Services) é usado **apenas
+para autenticar** o acesso ao Drive, com o escopo mínimo `drive.appdata`.
+
+Sincronização é **merge por item**, não last-write-wins de arquivo: cada credencial/token
+carrega um `updatedAt` e exclusões viram tombstones, então dois dispositivos editando em
+paralelo convergem sem se sobrescrever (`mergeVaults` em `packages/core/src/sync.ts` é
+comutativo e idempotente). O ciclo é pull → decifra → merge → push, disparado ao desbloquear
+e após cada alteração (debounced).
+
+### Configurar o Google Drive (opcional)
+
+1. Crie um **OAuth Client ID** (tipo "Web application") em
+   [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials),
+   habilite a **Google Drive API** e adicione a origem do app em "Authorized JavaScript origins".
+2. Copie `apps/pwa/.env.example` para `apps/pwa/.env` e preencha `VITE_GOOGLE_CLIENT_ID`.
+3. Sem essa variável o app funciona 100% offline — a opção de conectar aparece desabilitada com a devida indicação.
 
 ## Segurança
 

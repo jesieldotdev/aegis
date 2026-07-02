@@ -39,6 +39,7 @@ export function EditItem() {
       totpSecret = parsed.secret;
     }
 
+    // updatedAt é carimbado por saveCredential no momento de gravar.
     const cred: Credential = {
       id: existing?.id ?? crypto.randomUUID(),
       name: name.trim(),
@@ -49,6 +50,7 @@ export function EditItem() {
       passkey: existing?.passkey ?? false,
       totpSecret,
       notes: notes.trim() || undefined,
+      updatedAt: existing?.updatedAt ?? 0,
     };
     saveCredential(cred);
     closeEdit();

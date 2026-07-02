@@ -1,4 +1,5 @@
 import { decrypt, encrypt, type EncryptedEnvelope } from './crypto';
+import { normalizeVault } from './sync';
 import type { Vault } from './types';
 
 export type AegisBackupFile = {
@@ -23,5 +24,5 @@ export async function importVault(fileContents: string, masterPassword: string):
   const parsed = JSON.parse(fileContents) as AegisBackupFile;
   if (parsed.format !== 'aegis-backup') throw new Error('Arquivo .aegis inválido');
   const plaintext = await decrypt(parsed.data, masterPassword);
-  return JSON.parse(plaintext) as Vault;
+  return normalizeVault(JSON.parse(plaintext) as Vault);
 }

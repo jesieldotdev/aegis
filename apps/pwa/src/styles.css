@@ -967,6 +967,26 @@ button {
   color: var(--success);
 }
 
+.set-row-sub--danger {
+  color: var(--danger);
+}
+
+.set-account-email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.set-row--busy .set-row-icon {
+  animation: aeg-spin 0.9s linear infinite;
+}
+
+@keyframes aeg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .set-lock-btn {
   padding: 15px;
   border-radius: 14px;

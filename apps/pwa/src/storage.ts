@@ -12,6 +12,7 @@ import { fromBase64, toBase64, type EncryptedEnvelope } from '@aegis/core';
 const VAULT_KEY = 'aegis.vault.v1';
 const SETTINGS_KEY = 'aegis.settings.v1';
 const WRAPPED_KEY = 'aegis.wrappedKey.v1';
+const GOOGLE_KEY = 'aegis.google.v1';
 
 // ---------- Cofre cifrado ----------
 
@@ -37,6 +38,24 @@ export type Settings = {
 };
 
 export const DEFAULT_SETTINGS: Settings = { bio: false, backup: true, autoLockMin: 1 };
+
+// ---------- Conta Google lembrada (só e-mail/nome, para reconectar) ----------
+
+export type RememberedGoogle = { email: string; name: string; picture?: string };
+
+export function loadGoogle(): RememberedGoogle | null {
+  try {
+    const raw = localStorage.getItem(GOOGLE_KEY);
+    return raw ? (JSON.parse(raw) as RememberedGoogle) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveGoogle(account: RememberedGoogle | null): void {
+  if (account) localStorage.setItem(GOOGLE_KEY, JSON.stringify(account));
+  else localStorage.removeItem(GOOGLE_KEY);
+}
 
 export function loadSettings(): Settings {
   try {

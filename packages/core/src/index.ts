@@ -1,4 +1,5 @@
 export * from './types';
+export * from './sync';
 export * from './base32';
 export * from './totp';
 export * from './otpauth';

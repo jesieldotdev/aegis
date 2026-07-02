@@ -11,6 +11,7 @@ import {
 import {
   DEFAULT_GENERATOR_OPTIONS,
   PBKDF2_ITERATIONS,
+  credKey,
   decryptWithKey,
   demoVault,
   deriveVaultKey,
@@ -19,8 +20,10 @@ import {
   generatePassword,
   importVault,
   isWebAuthnAvailable,
+  normalizeVault,
   randomSalt,
   registerBiometric,
+  tokenKey,
   verifyBiometric,
   type Credential,
   type GeneratorOptions,
@@ -31,25 +34,47 @@ import {
   DEFAULT_SETTINGS,
   clearWrappedVaultKey,
   hasWrappedVaultKey,
+  loadGoogle,
   loadSettings,
   loadVaultEnvelope,
+  saveGoogle,
   saveSettings,
   saveVaultEnvelope,
   storeWrappedVaultKey,
   unwrapVaultKey,
+  type RememberedGoogle,
   type Settings,
 } from './storage';
+import {
+  clearToken,
+  fetchAccount,
+  getAccessToken,
+  isGoogleConfigured,
+} from './google';
+import { syncWithDrive } from './sync';
 
 export type Tab = 'vault' | '2fa' | 'gen' | 'settings';
 export type Folder = 'Todos' | 'Pessoal' | 'Trabalho' | 'Financeiro';
 export type Phase = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 
 const SCAN_MIN_MS = 1_150;
+const SYNC_DEBOUNCE_MS = 2_500;
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
+
+export type GoogleState = {
+  configured: boolean;
+  account: RememberedGoogle | null;
+  status: SyncStatus;
+  lastSync: number | null;
+  error: string;
+};
 
 type AppState = {
   phase: Phase;
   vault: Vault | null;
   settings: Settings;
+  google: GoogleState;
   /** Biometria pronta para uso na tela de bloqueio. */
   bioReady: boolean;
   scanning: boolean;
@@ -85,7 +110,7 @@ type AppState = {
 
   saveCredential: (cred: Credential) => void;
   deleteCredential: (id: string) => void;
-  addToken: (token: Omit<TotpToken, 'id'>) => void;
+  addToken: (token: Omit<TotpToken, 'id' | 'updatedAt'>) => void;
   deleteToken: (id: string) => void;
 
   setGenOpts: (patch: Partial<GeneratorOptions>) => void;
@@ -98,6 +123,10 @@ type AppState = {
   share: (cred: Credential) => void;
   doExport: () => void;
   importBackup: (fileText: string, filePassword: string) => Promise<boolean>;
+
+  connectGoogle: () => Promise<void>;
+  disconnectGoogle: () => void;
+  syncNow: () => Promise<void>;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -121,10 +150,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [genOpts, setGenOptsState] = useState<GeneratorOptions>(DEFAULT_GENERATOR_OPTIONS);
   const [genPass, setGenPass] = useState(() => generatePassword(DEFAULT_GENERATOR_OPTIONS));
   const [toast, setToast] = useState('');
+  const [google, setGoogle] = useState<GoogleState>({
+    configured: isGoogleConfigured(),
+    account: null,
+    status: 'idle',
+    lastSync: null,
+    error: '',
+  });
 
   const keyRef = useRef<CryptoKey | null>(null);
   const kdfRef = useRef<{ salt: string; iterations: number } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
+  const syncTimer = useRef<ReturnType<typeof setTimeout>>();
+  const vaultRef = useRef<Vault | null>(null);
+  vaultRef.current = vault;
 
   // Estado inicial: cofre existente → bloqueado; senão → onboarding
   useEffect(() => {
@@ -132,6 +171,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const stored = loadSettings();
     setSettingsState(stored);
     setBioReady(stored.bio && hasWrappedVaultKey() && isWebAuthnAvailable());
+    setGoogle((g) => ({ ...g, account: loadGoogle() }));
     setPhase(envelope ? 'locked' : 'onboarding');
   }, []);
 
@@ -161,16 +201,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveVaultEnvelope({ v: 1, kdf: 'PBKDF2-SHA256', iterations: kdf.iterations, salt: kdf.salt, iv, ct });
   }, []);
 
+  // ---------- Sincronização com o Google Drive ----------
+
+  /** Executa um ciclo pull+merge+push. `silent` evita toasts em auto-sync. */
+  const runSync = useCallback(async (silent: boolean): Promise<void> => {
+    const key = keyRef.current;
+    const kdf = kdfRef.current;
+    const current = vaultRef.current;
+    if (!key || !kdf || !current || !loadGoogle() || !isGoogleConfigured()) return;
+
+    if (!navigator.onLine) {
+      setGoogle((g) => ({ ...g, status: 'offline' }));
+      return;
+    }
+    setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
+    try {
+      const token = await getAccessToken(false);
+      const { vault: merged, changed } = await syncWithDrive(current, { token, key, kdf });
+      if (changed) {
+        await persist(merged);
+        setVault(merged);
+      }
+      setGoogle((g) => ({ ...g, status: 'synced', lastSync: Date.now(), error: '' }));
+      if (!silent && changed) showToast('Cofre sincronizado');
+    } catch (err) {
+      setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
+      if (!silent) showToast('Falha na sincronização');
+    }
+    // showToast é estável; persist idem
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persist]);
+
+  /** Agenda um push após uma mutação local (debounced). */
+  const scheduleSync = useCallback(() => {
+    if (!loadGoogle() || !isGoogleConfigured()) return;
+    clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => void runSync(true), SYNC_DEBOUNCE_MS);
+  }, [runSync]);
+
   const mutateVault = useCallback(
     (fn: (v: Vault) => Vault) => {
       setVault((prev) => {
         if (!prev) return prev;
         const next = fn(prev);
         void persist(next);
+        scheduleSync();
         return next;
       });
     },
-    [persist],
+    [persist, scheduleSync],
   );
 
   // ---------- Ciclo de vida do cofre ----------
@@ -184,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       kdfRef.current = { salt, iterations: PBKDF2_ITERATIONS };
       const fresh: Vault = seedDemo
         ? demoVault(profileName)
-        : { profile: { name: profileName }, credentials: [], tokens: [] };
+        : { profile: { name: profileName }, credentials: [], tokens: [], tombstones: {}, updatedAt: Date.now() };
       await persist(fresh);
       setVault(fresh);
       setPhase('unlocked');
@@ -192,13 +271,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
-  const finishUnlock = useCallback((unlockedVault: Vault) => {
-    setVault(unlockedVault);
-    setUnlockError('');
-    setPhase('unlocked');
-    setTabState('vault');
-    setDetailId(null);
-  }, []);
+  const finishUnlock = useCallback(
+    (unlockedVault: Vault) => {
+      setVault(normalizeVault(unlockedVault));
+      setUnlockError('');
+      setPhase('unlocked');
+      setTabState('vault');
+      setDetailId(null);
+      // Puxa do Drive ao desbloquear (se conectado)
+      if (loadGoogle() && isGoogleConfigured()) setTimeout(() => void runSync(true), 300);
+    },
+    [runSync],
+  );
 
   const unlockWithPassword = useCallback(
     async (password: string): Promise<boolean> => {
@@ -209,7 +293,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const plaintext = await decryptWithKey(key, envelope.iv, envelope.ct);
         keyRef.current = key;
         kdfRef.current = { salt: envelope.salt, iterations: envelope.iterations };
-        finishUnlock(JSON.parse(plaintext) as Vault);
+        finishUnlock(normalizeVault(JSON.parse(plaintext) as Vault));
         return true;
       } catch {
         setUnlockError('Senha-mestra incorreta');
@@ -240,7 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const plaintext = await decryptWithKey(key, envelope.iv, envelope.ct);
           keyRef.current = key;
           kdfRef.current = { salt: envelope.salt, iterations: envelope.iterations };
-          finish(() => finishUnlock(JSON.parse(plaintext) as Vault));
+          finish(() => finishUnlock(normalizeVault(JSON.parse(plaintext) as Vault)));
         } catch {
           finish(() => setUnlockError('Use a senha-mestra'));
         }
@@ -302,13 +386,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const saveCredential = useCallback(
     (cred: Credential) => {
+      const stamped = { ...cred, updatedAt: Date.now() };
       mutateVault((v) => {
-        const exists = v.credentials.some((c) => c.id === cred.id);
+        const exists = v.credentials.some((c) => c.id === stamped.id);
         return {
           ...v,
           credentials: exists
-            ? v.credentials.map((c) => (c.id === cred.id ? cred : c))
-            : [...v.credentials, cred],
+            ? v.credentials.map((c) => (c.id === stamped.id ? stamped : c))
+            : [...v.credentials, stamped],
+          updatedAt: Date.now(),
         };
       });
       showToast('Item salvo');
@@ -318,7 +404,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteCredential = useCallback(
     (id: string) => {
-      mutateVault((v) => ({ ...v, credentials: v.credentials.filter((c) => c.id !== id) }));
+      const now = Date.now();
+      mutateVault((v) => ({
+        ...v,
+        credentials: v.credentials.filter((c) => c.id !== id),
+        tombstones: { ...v.tombstones, [credKey(id)]: now },
+        updatedAt: now,
+      }));
       setDetailId(null);
       setEditingId(undefined);
       showToast('Item excluído');
@@ -327,8 +419,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const addToken = useCallback(
-    (token: Omit<TotpToken, 'id'>) => {
-      mutateVault((v) => ({ ...v, tokens: [...v.tokens, { ...token, id: crypto.randomUUID() }] }));
+    (token: Omit<TotpToken, 'id' | 'updatedAt'>) => {
+      const now = Date.now();
+      mutateVault((v) => ({
+        ...v,
+        tokens: [...v.tokens, { ...token, id: crypto.randomUUID(), updatedAt: now }],
+        updatedAt: now,
+      }));
       showToast('Token adicionado');
     },
     [mutateVault, showToast],
@@ -336,7 +433,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteToken = useCallback(
     (id: string) => {
-      mutateVault((v) => ({ ...v, tokens: v.tokens.filter((t) => t.id !== id) }));
+      const now = Date.now();
+      mutateVault((v) => ({
+        ...v,
+        tokens: v.tokens.filter((t) => t.id !== id),
+        tombstones: { ...v.tombstones, [tokenKey(id)]: now },
+        updatedAt: now,
+      }));
       showToast('Token removido');
     },
     [mutateVault, showToast],
@@ -454,9 +557,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [mutateVault, showToast],
   );
 
+  // ---------- Google Drive ----------
+
+  const connectGoogle = useCallback(async () => {
+    if (!isGoogleConfigured()) {
+      showToast('Configure o VITE_GOOGLE_CLIENT_ID');
+      return;
+    }
+    setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
+    try {
+      const token = await getAccessToken(true);
+      const account = await fetchAccount(token);
+      const remembered: RememberedGoogle = { email: account.email, name: account.name, picture: account.picture };
+      saveGoogle(remembered);
+      setGoogle((g) => ({ ...g, account: remembered }));
+      await runSync(false);
+      showToast(`Conectado como ${account.email}`);
+    } catch (err) {
+      setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
+      showToast('Não foi possível conectar ao Google');
+    }
+  }, [runSync, showToast]);
+
+  const disconnectGoogle = useCallback(() => {
+    clearToken();
+    saveGoogle(null);
+    clearTimeout(syncTimer.current);
+    setGoogle((g) => ({ ...g, account: null, status: 'idle', lastSync: null, error: '' }));
+    showToast('Google desconectado');
+  }, [showToast]);
+
+  const syncNow = useCallback(() => runSync(false), [runSync]);
+
   const value = useMemo<AppState>(
     () => ({
-      phase, vault, settings, bioReady, scanning, unlockError,
+      phase, vault, settings, google, bioReady, scanning, unlockError,
       tab, detailId, editingId, addingToken, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
@@ -466,15 +601,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveCredential, deleteCredential, addToken, deleteToken,
       setGenOpts, regen,
       setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
+      connectGoogle, disconnectGoogle, syncNow,
     }),
     [
-      phase, vault, settings, bioReady, scanning, unlockError,
+      phase, vault, settings, google, bioReady, scanning, unlockError,
       tab, detailId, editingId, addingToken, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
       setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
       toggleReveal, saveCredential, deleteCredential, addToken, deleteToken,
       setGenOpts, regen, setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
+      connectGoogle, disconnectGoogle, syncNow,
     ],
   );
 

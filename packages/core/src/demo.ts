@@ -6,7 +6,10 @@ import type { Credential, TotpToken, Vault } from './types';
  * Segredos TOTP são base32 válido (RFC 4648) — gerados para a demo.
  */
 
-export const DEMO_CREDENTIALS: Credential[] = [
+type DemoCred = Omit<Credential, 'updatedAt'>;
+type DemoToken = Omit<TotpToken, 'updatedAt'>;
+
+const DEMO_CREDENTIALS_SEED: DemoCred[] = [
   {
     id: 'google', name: 'Google', domain: 'accounts.google.com',
     username: 'marina.souza@gmail.com', password: 'Xt9$mK2pLq7@vNw4',
@@ -58,7 +61,7 @@ export const DEMO_CREDENTIALS: Credential[] = [
   },
 ];
 
-export const DEMO_TOKENS: TotpToken[] = [
+const DEMO_TOKENS_SEED: DemoToken[] = [
   { id: 'google', issuer: 'Google', account: 'marina.souza@gmail.com', secret: 'JBSWY3DPEHPK3PXP' },
   { id: 'github', issuer: 'GitHub', account: 'marina-dev', secret: 'GEZDGNBVGY3TQOJQ' },
   { id: 'nubank', issuer: 'Nubank', account: 'marina.souza', secret: 'MFRGGZDFMZTWQ2LK' },
@@ -66,11 +69,17 @@ export const DEMO_TOKENS: TotpToken[] = [
   { id: 'binance', issuer: 'Binance', account: 'marina.souza@gmail.com', secret: 'MZXW6YTBOJRGK6TT' },
 ];
 
+export const DEMO_CREDENTIALS: Credential[] = DEMO_CREDENTIALS_SEED.map((c) => ({ ...c, updatedAt: 0 }));
+export const DEMO_TOKENS: TotpToken[] = DEMO_TOKENS_SEED.map((t) => ({ ...t, updatedAt: 0 }));
+
 export function demoVault(profileName: string): Vault {
+  const now = Date.now();
   return {
     profile: { name: profileName },
-    credentials: DEMO_CREDENTIALS,
-    tokens: DEMO_TOKENS,
+    credentials: DEMO_CREDENTIALS_SEED.map((c) => ({ ...c, updatedAt: now })),
+    tokens: DEMO_TOKENS_SEED.map((t) => ({ ...t, updatedAt: now })),
+    tombstones: {},
+    updatedAt: now,
   };
 }
 
