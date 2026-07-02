@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "outDir": "dist-types",
+    "rootDir": "../..",
+    "types": ["vite/client"]
+  },
+  "include": ["src", "../../packages/core/src", "../../packages/ui/src"]
+}

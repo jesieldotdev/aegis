@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Aegis — Gerenciador de senhas & 2FA",
+  "version": "0.1.0",
+  "description": "Autofill de credenciais e códigos 2FA do cofre Aegis",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Aegis"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["activeTab", "clipboardWrite"],
+  "host_permissions": []
+}
