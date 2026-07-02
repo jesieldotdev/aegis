@@ -99,11 +99,20 @@ e após cada alteração (debounced).
 3. Sem essa variável o app funciona 100% offline — a opção de conectar aparece desabilitada com a devida indicação.
 
 **Para a extensão** (mesmo Client ID Web): o Chrome usa o redirect
-`https://<extension-id>.chromiumapp.org/`. Descubra o `<extension-id>` em
-`chrome://extensions` (com a extensão carregada) e adicione essa URL em
-"Authorized redirect URIs" do OAuth Client. Defina `VITE_GOOGLE_CLIENT_ID`
-também para o build da extensão (`apps/extension/.env`). Para um id estável
-entre reinstalações, fixe uma `key` no `manifest.json`.
+`https://<extension-id>.chromiumapp.org/`. O `manifest.json` já fixa uma
+`key`, então o id é **estável**: `baoahocbjpnaijckmjifgfcjjnidajph`. No OAuth
+Client (Web application) → **Authorized redirect URIs**, adicione exatamente:
+
+```
+https://baoahocbjpnaijckmjifgfcjjnidajph.chromiumapp.org/
+```
+
+Defina `VITE_GOOGLE_CLIENT_ID` também para o build da extensão
+(`apps/extension/.env`). É esse passo que resolve o erro
+`400: redirect_uri_mismatch`.
+
+> Se você gerar sua própria `key` (recomendado para publicar), o id muda —
+> recompute e registre o novo redirect. O id aparece em `chrome://extensions`.
 
 ## Segurança
 
