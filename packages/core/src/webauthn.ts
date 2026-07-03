@@ -62,7 +62,7 @@ export async function registerBiometric(userName: string): Promise<boolean> {
         authenticatorSelection: {
           authenticatorAttachment: 'platform',
           userVerification: 'required',
-          residentKey: 'preferred',
+          residentKey: 'discouraged',
         },
         timeout: 60_000,
       },
