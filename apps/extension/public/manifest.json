@@ -20,5 +20,13 @@
     }
   ],
   "permissions": ["activeTab", "clipboardWrite", "identity", "storage"],
-  "host_permissions": ["https://www.googleapis.com/*"]
+  "host_permissions": ["https://www.googleapis.com/*"],
+  "oauth2": {
+    "client_id": "333045718126-iahaam6mj458veea7s4kd6frqrreeinm.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.appdata",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  }
 }

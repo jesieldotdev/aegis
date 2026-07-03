@@ -10,6 +10,8 @@ declare namespace chrome {
   }
   namespace runtime {
     const id: string | undefined;
+    const lastError: { message?: string } | undefined;
+    function getManifest(): Record<string, unknown>;
     const onMessage: {
       addListener(
         callback: (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void,
@@ -19,8 +21,12 @@ declare namespace chrome {
     const onStartup: { addListener(cb: () => void): void };
   }
   namespace identity {
-    function getRedirectURL(path?: string): string;
-    function launchWebAuthFlow(details: { url: string; interactive: boolean }): Promise<string>;
+    type GetAuthTokenResult = string | { token?: string };
+    function getAuthToken(
+      details: { interactive?: boolean; scopes?: string[] },
+      callback: (result?: GetAuthTokenResult) => void,
+    ): void;
+    function removeCachedAuthToken(details: { token: string }, callback: () => void): void;
   }
   namespace storage {
     type AccessLevel = 'TRUSTED_CONTEXTS' | 'TRUSTED_AND_UNTRUSTED_CONTEXTS';

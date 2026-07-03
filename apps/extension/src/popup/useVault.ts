@@ -9,7 +9,7 @@ import {
   type GoogleAccount,
   type Vault,
 } from '@aegis/core';
-import { isGoogleConfigured, requestAccessToken } from '../auth';
+import { isGoogleConfigured, requestAccessToken, revokeToken } from '../auth';
 import {
   allowContentScriptSession,
   clearSession,
@@ -171,7 +171,11 @@ export function useVault(): VaultController {
 
   const disconnect = useCallback(() => {
     keyRef.current = null;
-    void clearAll();
+    void (async () => {
+      const token = await getSessionToken();
+      if (token) await revokeToken(token);
+      await clearAll();
+    })();
     setVault(null);
     setEnvelope(null);
     setAccount(null);

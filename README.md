@@ -98,21 +98,24 @@ e após cada alteração (debounced).
 2. Copie `apps/pwa/.env.example` para `apps/pwa/.env` e preencha `VITE_GOOGLE_CLIENT_ID`.
 3. Sem essa variável o app funciona 100% offline — a opção de conectar aparece desabilitada com a devida indicação.
 
-**Para a extensão** (mesmo Client ID Web): o Chrome usa o redirect
-`https://<extension-id>.chromiumapp.org/`. O `manifest.json` já fixa uma
-`key`, então o id é **estável**: `baoahocbjpnaijckmjifgfcjjnidajph`. No OAuth
-Client (Web application) → **Authorized redirect URIs**, adicione exatamente:
+**Para a extensão** — use um OAuth Client do tipo **"Extensão do Chrome"**
+(NÃO "Web application"). Esse tipo **não usa redirect URI** — a extensão
+autentica com `chrome.identity.getAuthToken`, e o Chrome cuida do token.
 
-```
-https://baoahocbjpnaijckmjifgfcjjnidajph.chromiumapp.org/
-```
+1. O `manifest.json` fixa uma `key`, então o id do item é **estável**:
+   `baoahocbjpnaijckmjifgfcjjnidajph`.
+2. No Google Cloud Console → **Credenciais** → **Criar credenciais** → **ID
+   do cliente OAuth** → tipo **Extensão do Chrome** → em "ID do item" cole
+   `baoahocbjpnaijckmjifgfcjjnidajph`.
+3. Copie o **Client ID** gerado para o bloco `oauth2.client_id` do
+   `apps/extension/public/manifest.json` (rebuild depois).
+4. Na **tela de consentimento OAuth**, enquanto o app estiver em "Testing",
+   adicione sua conta em **Test users** — senão o Google bloqueia com
+   `access_denied`.
 
-Defina `VITE_GOOGLE_CLIENT_ID` também para o build da extensão
-(`apps/extension/.env`). É esse passo que resolve o erro
-`400: redirect_uri_mismatch`.
-
-> Se você gerar sua própria `key` (recomendado para publicar), o id muda —
-> recompute e registre o novo redirect. O id aparece em `chrome://extensions`.
+> Não há redirect URI para registrar neste tipo de client — se você viu
+> `redirect_uri_mismatch`, era porque o código antigo usava o fluxo Web;
+> agora usa `getAuthToken`, que dispensa redirect.
 
 ## Segurança
 
