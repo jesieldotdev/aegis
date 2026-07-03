@@ -134,16 +134,26 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
   const host = useActiveTabHost();
   const [search, setSearch] = useState('');
   const [show2fa, setShow2fa] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState('');
   const [now, setNow] = useState(() => Date.now());
 
   const forPage = useMemo(() => matchByHost(vault.credentials, host), [vault.credentials, host]);
+  const allSorted = useMemo(
+    () => [...vault.credentials].sort((a, b) => a.name.localeCompare(b.name)),
+    [vault.credentials],
+  );
   const q = search.trim().toLowerCase();
-  const list = q
-    ? vault.credentials.filter((c) => c.name.toLowerCase().includes(q) || c.domain.toLowerCase().includes(q))
-    : forPage;
+  const searching = q.length > 0;
+  const list = searching
+    ? allSorted.filter(
+        (c) => c.name.toLowerCase().includes(q) || c.domain.toLowerCase().includes(q) || c.username.toLowerCase().includes(q),
+      )
+    : showAll
+      ? allSorted
+      : forPage;
 
   const openCred = openId ? vault.credentials.find((c) => c.id === openId) : undefined;
   // Faz o relógio andar enquanto houver algum 2FA visível
@@ -198,8 +208,22 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" />
         </div>
 
-        <div className="pop-section">{q ? 'RESULTADOS' : 'PARA ESTA PÁGINA'}</div>
-        {list.length === 0 && <div className="pop-empty">Nenhuma conta para {host || 'esta página'}</div>}
+        <div className="pop-section pop-section--row">
+          <span>{searching ? 'RESULTADOS' : showAll ? `TODAS AS CONTAS · ${allSorted.length}` : 'PARA ESTA PÁGINA'}</span>
+          {!searching && (
+            <button type="button" className="pop-see-all" onClick={() => setShowAll((v) => !v)}>
+              {showAll ? 'Só desta página' : `Ver todas (${allSorted.length})`}
+            </button>
+          )}
+        </div>
+        {list.length === 0 && (
+          <div className="pop-empty">
+            {searching
+              ? 'Nenhuma conta encontrada'
+              : `Nenhuma conta para ${host || 'esta página'} — toque em "Ver todas"`}
+          </div>
+        )}
+        <div className="pop-list">
         {list.map((cred) => {
           const avatar = avatarFor(cred.id, cred.name);
           const open = openId === cred.id;
@@ -259,6 +283,7 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
             </div>
           );
         })}
+        </div>
 
         <div className="pop-actions">
           <button
