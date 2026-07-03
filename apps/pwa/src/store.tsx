@@ -47,8 +47,10 @@ import {
 } from './storage';
 import {
   clearToken,
+  downloadVault,
   fetchAccount,
   getAccessToken,
+  getCachedToken,
   isGoogleConfigured,
 } from './google';
 import { syncWithDrive } from './sync';
@@ -127,6 +129,8 @@ type AppState = {
   connectGoogle: () => Promise<void>;
   disconnectGoogle: () => void;
   syncNow: () => Promise<void>;
+  /** Restaura um cofre existente do Drive (onboarding em novo dispositivo). */
+  restoreFromGoogle: () => Promise<void>;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -203,7 +207,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ---------- Sincronização com o Google Drive ----------
 
-  /** Executa um ciclo pull+merge+push. `silent` evita toasts em auto-sync. */
+  /**
+   * Executa um ciclo pull+merge+push. `silent` (auto-sync) NUNCA abre o
+   * diálogo do Google: usa só um token já em cache; sem token, apenas ignora.
+   * O login interativo acontece só em ações explícitas (Conectar/Sincronizar).
+   */
   const runSync = useCallback(async (silent: boolean): Promise<void> => {
     const key = keyRef.current;
     const kdf = kdfRef.current;
@@ -214,9 +222,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGoogle((g) => ({ ...g, status: 'offline' }));
       return;
     }
+
+    let token = getCachedToken();
+    if (!token) {
+      if (silent) return; // auto-sync jamais interrompe com o login do Google
+      try {
+        token = await getAccessToken(false);
+      } catch (err) {
+        setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
+        showToast('Falha na sincronização');
+        return;
+      }
+    }
+
     setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
     try {
-      const token = await getAccessToken(false);
       const { vault: merged, changed } = await syncWithDrive(current, { token, key, kdf });
       if (changed) {
         await persist(merged);
@@ -228,7 +248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
       if (!silent) showToast('Falha na sincronização');
     }
-    // showToast é estável; persist idem
+    // showToast e persist são estáveis
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persist]);
 
@@ -589,6 +609,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const syncNow = useCallback(() => runSync(false), [runSync]);
 
+  /**
+   * Onboarding em dispositivo novo: entra com Google, baixa o cofre cifrado
+   * existente e vai para a tela de bloqueio (a senha-mestra decifra em seguida).
+   * Assim não é preciso "criar cofre" toda vez.
+   */
+  const restoreFromGoogle = useCallback(async () => {
+    if (!isGoogleConfigured()) {
+      showToast('Configure o VITE_GOOGLE_CLIENT_ID');
+      return;
+    }
+    setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
+    try {
+      const token = await getAccessToken(true);
+      const account = await fetchAccount(token);
+      const envelope = await downloadVault(token);
+      if (!envelope) {
+        setGoogle((g) => ({ ...g, status: 'idle' }));
+        showToast('Nenhum cofre no Drive desta conta — crie um');
+        return;
+      }
+      const remembered: RememberedGoogle = { email: account.email, name: account.name, picture: account.picture };
+      saveVaultEnvelope(envelope);
+      saveGoogle(remembered);
+      setGoogle((g) => ({ ...g, account: remembered, status: 'synced', lastSync: Date.now() }));
+      setBioReady(false); // biometria precisa ser reconfigurada neste aparelho
+      setPhase('locked');
+      showToast('Cofre encontrado — digite a senha-mestra');
+    } catch (err) {
+      setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
+      showToast('Não foi possível conectar ao Google');
+    }
+  }, [showToast]);
+
   const value = useMemo<AppState>(
     () => ({
       phase, vault, settings, google, bioReady, scanning, unlockError,
@@ -601,7 +654,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveCredential, deleteCredential, addToken, deleteToken,
       setGenOpts, regen,
       setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
-      connectGoogle, disconnectGoogle, syncNow,
+      connectGoogle, disconnectGoogle, syncNow, restoreFromGoogle,
     }),
     [
       phase, vault, settings, google, bioReady, scanning, unlockError,
@@ -611,7 +664,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
       toggleReveal, saveCredential, deleteCredential, addToken, deleteToken,
       setGenOpts, regen, setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
-      connectGoogle, disconnectGoogle, syncNow,
+      connectGoogle, disconnectGoogle, syncNow, restoreFromGoogle,
     ],
   );
 

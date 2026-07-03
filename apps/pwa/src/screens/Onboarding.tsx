@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { AegisLogo, IconEye, IconEyeOff } from '@aegis/ui';
+import { AegisLogo, IconEye, IconEyeOff, IconGoogle } from '@aegis/ui';
 import { estimateStrength, strengthMeta } from '@aegis/core';
 import { useApp } from '../store';
 
 /** Primeira execução: cria o cofre e define a senha-mestra. */
 export function Onboarding() {
-  const { createVault } = useApp();
+  const { createVault, google, restoreFromGoogle } = useApp();
+  const [restoring, setRestoring] = useState(false);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -94,10 +95,32 @@ export function Onboarding() {
 
         {error && <div className="ob-error">{error}</div>}
 
-        <button type="submit" className="ob-submit" disabled={creating}>
+        <button type="submit" className="ob-submit" disabled={creating || restoring}>
           {creating ? 'Cifrando cofre…' : 'Criar cofre'}
         </button>
       </form>
+
+      {google.configured && (
+        <>
+          <div className="ob-divider"><span>ou</span></div>
+          <button
+            type="button"
+            className="ob-restore"
+            disabled={restoring || creating}
+            onClick={async () => {
+              setRestoring(true);
+              try {
+                await restoreFromGoogle();
+              } finally {
+                setRestoring(false);
+              }
+            }}
+          >
+            <IconGoogle size={17} />
+            {restoring ? 'Buscando cofre…' : 'Já tenho um cofre — entrar com Google'}
+          </button>
+        </>
+      )}
     </div>
   );
 }

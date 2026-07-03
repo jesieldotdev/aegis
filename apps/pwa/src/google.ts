@@ -90,6 +90,15 @@ export async function getAccessToken(interactive: boolean): Promise<string> {
   });
 }
 
+/**
+ * Retorna um token válido do cache em memória, ou null. NUNCA abre UI —
+ * é o que a sincronização automática usa para jamais interromper o usuário
+ * com o diálogo do Google ao desbloquear/salvar.
+ */
+export function getCachedToken(): string | null {
+  return cachedToken && cachedToken.expiresAt - 60_000 > Date.now() ? cachedToken.value : null;
+}
+
 export function clearToken(): void {
   const token = cachedToken?.value;
   cachedToken = null;

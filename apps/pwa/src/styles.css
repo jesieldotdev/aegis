@@ -1183,6 +1183,50 @@ button {
   cursor: wait;
 }
 
+.ob-divider {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 4px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ob-divider::before,
+.ob-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+}
+
+.ob-restore {
+  width: 100%;
+  max-width: 320px;
+  padding: 13px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 6px;
+}
+
+.ob-restore:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 /* ===== Lock: senha-mestra ===== */
 .lock-form {
   margin-top: 44px;
