@@ -4,9 +4,21 @@
   "version": "0.1.0",
   "description": "Autofill de credenciais e códigos 2FA do cofre Aegis",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAruIL+7ijPYntoy1NAYDfJpQ+dSolOCUyDzHs1QICeCTjuk0pKKTNDOgv8Hu13/VKMktmIWlFR2a7HmCWY0JdSNw9pmsnH1LIZQork1ilmvxZ30fYqBC3r6PiWyvkutsuIjI+YKcH832TbdDS5nGEes9Jqgs4X6K1YbuiCINojtJq2pyKOAOGlyRbbr/j4DgwreWbWt32rwksY30hNZw98trZV6eSz10/Ybzf4MShKdWLLeFGmp6DdquDN01tWBMHJo1+o9GtQdjvTf67f7/kZJMhn09NlwGH7iKoSpZRcc8gFnWvCikv/IACUgJblU3Gjj3p+JuDSx30ELQ+80JELwIDAQAB",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Aegis"
+    "default_title": "Aegis",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   },
   "background": {
     "service_worker": "background.js",
