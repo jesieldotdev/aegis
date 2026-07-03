@@ -54,7 +54,12 @@ npm run build
    ```
    Com o cofre desbloqueado, o dropdown "AEGIS · N contas para <domínio>" aparece sob o campo de e-mail.
 
-> A extensão só **puxa** o cofre do Drive (leitura); a edição continua no app PWA. O cofre decifrado vive em `chrome.storage.session` (some ao fechar o navegador) e é liberado ao content script para o autofill — "Bloquear" no popup limpa a sessão na hora.
+> A extensão puxa o cofre do Drive e também **cria contas** (botão "Nova
+> conta": gera senha, preenche a página e salva). A criação re-cifra o cofre
+> com a chave da sessão e envia ao Drive; o merge por item garante que o PWA
+> reconcilie. Editar/excluir itens existentes continua no PWA. O cofre
+> decifrado e a chave vivem em `chrome.storage.session` (somem ao fechar o
+> navegador) — "Bloquear" no popup limpa a sessão na hora.
 
 ## Telas (PWA)
 

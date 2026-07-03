@@ -3,8 +3,11 @@ import {
   decryptWithKey,
   deriveVaultKey,
   downloadVaultEnvelope,
+  encryptWithKey,
   fetchAccount,
   normalizeVault,
+  uploadVaultEnvelope,
+  type Credential,
   type EncryptedEnvelope,
   type GoogleAccount,
   type Vault,
@@ -14,10 +17,12 @@ import {
   allowContentScriptSession,
   clearSession,
   disconnect as clearAll,
+  getSessionKey,
   getSessionToken,
   getSessionVault,
   getStoredAccount,
   getStoredEnvelope,
+  setSessionKey,
   setSessionToken,
   setSessionVault,
   setStoredAccount,
@@ -36,6 +41,10 @@ export type VaultController = {
   connect: () => Promise<void>;
   unlock: (masterPassword: string) => Promise<void>;
   refresh: () => Promise<void>;
+  /** Cria uma credencial no cofre (cifra, salva local e envia ao Drive). */
+  addCredential: (draft: Omit<Credential, 'id' | 'updatedAt'>) => Promise<boolean>;
+  /** true quando há chave em memória/sessão para gravar. */
+  canWrite: boolean;
   lock: () => void;
   disconnect: () => void;
 };
@@ -47,19 +56,25 @@ export function useVault(): VaultController {
   const [envelope, setEnvelope] = useState<EncryptedEnvelope | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  // Chave derivada mantida só em memória, durante a sessão da popup.
+  const [canWrite, setCanWrite] = useState(false);
+  // Chave do cofre em memória, durante a sessão da popup.
   const keyRef = useRef<CryptoKey | null>(null);
 
   useEffect(() => {
     void allowContentScriptSession();
     (async () => {
-      const [sessionVault, storedAccount, storedEnv] = await Promise.all([
+      const [sessionVault, storedAccount, storedEnv, sessionKey] = await Promise.all([
         getSessionVault(),
         getStoredAccount(),
         getStoredEnvelope(),
+        getSessionKey(),
       ]);
       setAccount(storedAccount);
       setEnvelope(storedEnv);
+      if (sessionKey) {
+        keyRef.current = sessionKey;
+        setCanWrite(true);
+      }
       if (sessionVault) {
         setVault(sessionVault);
         setPhase('unlocked');
@@ -121,6 +136,8 @@ export function useVault(): VaultController {
         const unlocked = normalizeVault(JSON.parse(plaintext) as Vault);
         keyRef.current = key;
         await setSessionVault(unlocked);
+        await setSessionKey(key);
+        setCanWrite(true);
         setVault(unlocked);
         setPhase('unlocked');
       } catch {
@@ -128,6 +145,44 @@ export function useVault(): VaultController {
       } finally {
         setBusy(false);
       }
+    },
+    [envelope],
+  );
+
+  /**
+   * Cria uma credencial: cifra o cofre atualizado com a chave da sessão,
+   * grava local e envia ao Drive (best-effort). O merge por item garante que
+   * o PWA reconcilie na próxima sincronização.
+   */
+  const addCredential = useCallback(
+    async (draft: Omit<Credential, 'id' | 'updatedAt'>): Promise<boolean> => {
+      const key = keyRef.current;
+      const current = await getSessionVault();
+      const env = envelope ?? (await getStoredEnvelope());
+      if (!key || !current || !env) {
+        setError('Desbloqueie o cofre para salvar');
+        return false;
+      }
+      const now = Date.now();
+      const cred: Credential = { ...draft, id: crypto.randomUUID(), updatedAt: now };
+      const next = normalizeVault({ ...current, credentials: [...current.credentials, cred], updatedAt: now });
+
+      const { iv, ct } = await encryptWithKey(key, JSON.stringify(next));
+      const nextEnv: EncryptedEnvelope = { ...env, iv, ct };
+
+      await setStoredEnvelope(nextEnv);
+      await setSessionVault(next);
+      setEnvelope(nextEnv);
+      setVault(next);
+
+      // Envia ao Drive se houver token na sessão (não interrompe o usuário).
+      try {
+        const token = await getSessionToken();
+        if (token) await uploadVaultEnvelope(token, nextEnv);
+      } catch {
+        // Sincroniza na próxima vez; o cofre local já está atualizado.
+      }
+      return true;
     },
     [envelope],
   );
@@ -164,6 +219,7 @@ export function useVault(): VaultController {
 
   const lock = useCallback(() => {
     keyRef.current = null;
+    setCanWrite(false);
     void clearSession();
     setVault(null);
     setPhase(envelope ? 'locked' : 'disconnected');
@@ -171,6 +227,7 @@ export function useVault(): VaultController {
 
   const disconnect = useCallback(() => {
     keyRef.current = null;
+    setCanWrite(false);
     void (async () => {
       const token = await getSessionToken();
       if (token) await revokeToken(token);
@@ -189,9 +246,11 @@ export function useVault(): VaultController {
     configured: isGoogleConfigured(),
     busy,
     error,
+    canWrite,
     connect,
     unlock,
     refresh,
+    addCredential,
     lock,
     disconnect,
   };

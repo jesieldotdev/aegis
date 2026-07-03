@@ -246,17 +246,23 @@ if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
 
 // Preenchimento disparado pelo popup da toolbar
 if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-  chrome.runtime.onMessage.addListener((message: unknown) => {
+  chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
     const msg = message as { type?: string; username?: string; password?: string };
     if (msg?.type === 'aegis-fill' && msg.username && msg.password) {
       const fields = findLoginFields();
       if (fields) {
         injectStyles();
         setValue(fields.user, msg.username);
-        setValue(fields.pass, msg.password);
+        if (msg.password) setValue(fields.pass, msg.password);
         removeDropdown();
         showToast('Preenchido pela Aegis');
       }
+      return;
+    }
+    // A popup pergunta o usuário já digitado, para pré-preencher "Nova conta"
+    if (msg?.type === 'aegis-read-fields') {
+      const fields = findLoginFields();
+      sendResponse({ username: fields?.user.value ?? '' });
     }
   });
 }

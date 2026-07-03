@@ -8,6 +8,7 @@ import {
   TOTP_PERIOD,
   totpCounter,
   totpRemaining,
+  type Category,
   type Credential,
   type TotpToken,
   type Vault,
@@ -115,6 +116,142 @@ function InlineTotp({ secret, now, onCopy }: { secret: string; now: number; onCo
   );
 }
 
+const CATEGORIES: Category[] = ['Pessoal', 'Trabalho', 'Financeiro'];
+
+/** Nome sugerido a partir do host: "portainer.io" -> "Portainer". */
+function suggestedName(host: string): string {
+  const labels = host.replace(/^www\./, '').split('.');
+  const base = labels.length >= 2 ? labels[labels.length - 2] : labels[0] || '';
+  return base ? base[0].toUpperCase() + base.slice(1) : '';
+}
+
+async function readPageUsername(): Promise<string> {
+  if (typeof chrome === 'undefined' || !chrome.tabs) return '';
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabId = tabs[0]?.id;
+    if (tabId == null) return '';
+    const resp = (await chrome.tabs.sendMessage(tabId, { type: 'aegis-read-fields' })) as { username?: string };
+    return resp?.username ?? '';
+  } catch {
+    return '';
+  }
+}
+
+async function fillPage(username: string, password: string): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.tabs) return;
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabId = tabs[0]?.id;
+  if (tabId != null) {
+    await chrome.tabs.sendMessage(tabId, { type: 'aegis-fill', username, password }).catch(() => {});
+  }
+}
+
+/** Painel "Nova conta": gera senha, preenche a página e salva no cofre. */
+function NewAccountPanel({
+  host,
+  onClose,
+  onSaved,
+  addCredential,
+  copy,
+}: {
+  host: string;
+  onClose: () => void;
+  onSaved: () => void;
+  addCredential: (draft: Omit<Credential, 'id' | 'updatedAt'>) => Promise<boolean>;
+  copy: (label: string, value: string) => void;
+}) {
+  const [password, setPassword] = useState(() => generatePassword(DEFAULT_GENERATOR_OPTIONS));
+  const [name, setName] = useState(() => suggestedName(host));
+  const [username, setUsername] = useState('');
+  const [domain, setDomain] = useState(host);
+  const [category, setCategory] = useState<Category>('Pessoal');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    readPageUsername().then((u) => u && setUsername(u));
+  }, []);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setBusy(true);
+    const ok = await addCredential({
+      name: name.trim(),
+      domain: domain.trim(),
+      username: username.trim(),
+      password,
+      category,
+      passkey: false,
+    });
+    setBusy(false);
+    if (ok) onSaved();
+  };
+
+  return (
+    <div className="pop-new">
+      <div className="pop-new-pass">
+        <div className="pop-new-pass-value">
+          {password.split('').map((ch, i) => {
+            const cls = /[0-9]/.test(ch) ? 'g-num' : /[^a-zA-Z0-9]/.test(ch) ? 'g-sym' : undefined;
+            return (
+              <span key={i} className={cls}>
+                {ch}
+              </span>
+            );
+          })}
+        </div>
+        <div className="pop-new-pass-actions">
+          <button type="button" className="pop-mini" onClick={() => setPassword(generatePassword(DEFAULT_GENERATOR_OPTIONS))} title="Gerar outra">
+            <IconRefresh size={15} />
+          </button>
+          <button type="button" className="pop-mini pop-mini--accent" onClick={() => copy('Senha', password)} title="Copiar">
+            <IconCopy size={15} />
+          </button>
+        </div>
+      </div>
+
+      <label className="pop-field">
+        <span className="pop-field-label">Nome</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Portainer" />
+      </label>
+      <label className="pop-field">
+        <span className="pop-field-label">Usuário</span>
+        <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="usuário ou e-mail" autoCapitalize="none" />
+      </label>
+      <label className="pop-field">
+        <span className="pop-field-label">Domínio</span>
+        <input value={domain} onChange={(e) => setDomain(e.target.value)} autoCapitalize="none" />
+      </label>
+
+      <div className="pop-cats">
+        {CATEGORIES.map((c) => (
+          <button
+            type="button"
+            key={c}
+            className={`pop-cat${category === c ? ' pop-cat--active' : ''}`}
+            onClick={() => setCategory(c)}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      <div className="pop-actions">
+        <button type="button" className="pop-action" onClick={() => void fillPage(username, password)}>
+          <IconArrowRight size={14} />
+          Preencher
+        </button>
+        <button type="button" className="pop-action pop-action--primary" onClick={() => void save()} disabled={busy}>
+          {busy ? 'Salvando…' : 'Salvar no cofre'}
+        </button>
+      </div>
+      <button type="button" className="pop-new-cancel" onClick={onClose}>
+        Cancelar
+      </button>
+    </div>
+  );
+}
+
 function Header({ children }: { children?: React.ReactNode }) {
   return (
     <div className="pop-header">
@@ -125,11 +262,13 @@ function Header({ children }: { children?: React.ReactNode }) {
   );
 }
 
-function UnlockedView({ vault, onLock, onRefresh, busy }: {
+function UnlockedView({ vault, onLock, onRefresh, busy, canWrite, addCredential }: {
   vault: Vault;
   onLock: () => void;
   onRefresh: () => void;
   busy: boolean;
+  canWrite: boolean;
+  addCredential: (draft: Omit<Credential, 'id' | 'updatedAt'>) => Promise<boolean>;
 }) {
   const host = useActiveTabHost();
   const [search, setSearch] = useState('');
@@ -137,8 +276,14 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
   const [showAll, setShowAll] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState('');
   const [now, setNow] = useState(() => Date.now());
+
+  const toast = (msg: string) => {
+    setCopied(msg);
+    setTimeout(() => setCopied(''), 1400);
+  };
 
   const forPage = useMemo(() => matchByHost(vault.credentials, host), [vault.credentials, host]);
   const allSorted = useMemo(
@@ -191,6 +336,32 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
       window.close();
     }
   };
+
+  if (creating) {
+    return (
+      <div className="pop">
+        <Header>
+          <button type="button" className="pop-icon" onClick={onLock} title="Bloquear" aria-label="Bloquear">
+            <IconPadlock size={15} />
+          </button>
+        </Header>
+        <div className="pop-body">
+          <div className="pop-section" style={{ paddingTop: 0 }}>NOVA CONTA · {host || 'esta página'}</div>
+          <NewAccountPanel
+            host={host}
+            addCredential={addCredential}
+            copy={copy}
+            onClose={() => setCreating(false)}
+            onSaved={() => {
+              setCreating(false);
+              toast('Conta salva no cofre');
+            }}
+          />
+        </div>
+        {copied && <div className="pop-copied">{copied}</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="pop">
@@ -289,11 +460,11 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
           <button
             type="button"
             className="pop-action"
-            onClick={() => copy('Senha gerada', generatePassword(DEFAULT_GENERATOR_OPTIONS))}
-            title="Gerar e copiar senha forte"
+            onClick={() => (canWrite ? setCreating(true) : copy('Senha gerada', generatePassword(DEFAULT_GENERATOR_OPTIONS)))}
+            title={canWrite ? 'Gerar senha e criar conta' : 'Gerar e copiar senha forte'}
           >
             <IconRefresh size={14} />
-            Gerar
+            {canWrite ? 'Nova conta' : 'Gerar'}
           </button>
           <button
             type="button"
@@ -390,7 +561,16 @@ export function Popup() {
     );
   }
   if (ctrl.phase === 'unlocked' && ctrl.vault) {
-    return <UnlockedView vault={ctrl.vault} onLock={ctrl.lock} onRefresh={() => void ctrl.refresh()} busy={ctrl.busy} />;
+    return (
+      <UnlockedView
+        vault={ctrl.vault}
+        onLock={ctrl.lock}
+        onRefresh={() => void ctrl.refresh()}
+        busy={ctrl.busy}
+        canWrite={ctrl.canWrite}
+        addCredential={ctrl.addCredential}
+      />
+    );
   }
   if (ctrl.phase === 'locked') {
     return <LockView onUnlock={(pw) => void ctrl.unlock(pw)} busy={ctrl.busy} error={ctrl.error} />;

@@ -9,12 +9,13 @@
  * que permite o autofill sem repedir a senha-mestra a cada página, e some ao
  * fechar o navegador. Bloquear pela popup limpa a sessão na hora.
  */
-import type { EncryptedEnvelope, GoogleAccount, Vault } from '@aegis/core';
+import { fromBase64, toBase64, type EncryptedEnvelope, type GoogleAccount, type Vault } from '@aegis/core';
 
 const ENV_KEY = 'aegis.envelope';
 const ACCOUNT_KEY = 'aegis.account';
 const VAULT_KEY = 'aegis.vault';
 const TOKEN_KEY = 'aegis.token';
+const KEY_KEY = 'aegis.key';
 
 const hasChrome = typeof chrome !== 'undefined' && !!chrome.storage;
 
@@ -69,9 +70,35 @@ export async function setSessionToken(token: string): Promise<void> {
   await chrome.storage.session.set({ [TOKEN_KEY]: token });
 }
 
+/**
+ * Chave do cofre na sessão (bytes exportados). Necessária para re-cifrar o
+ * cofre ao criar contas pela extensão, mesmo que a popup seja reaberta. Fica
+ * no mesmo nível de exposição do cofre já decifrado em sessão.
+ */
+export async function setSessionKey(key: CryptoKey): Promise<void> {
+  if (!hasChrome) return;
+  const raw = new Uint8Array(await crypto.subtle.exportKey('raw', key));
+  await chrome.storage.session.set({ [KEY_KEY]: toBase64(raw) });
+}
+
+export async function getSessionKey(): Promise<CryptoKey | null> {
+  if (!hasChrome) return null;
+  const r = await chrome.storage.session.get(KEY_KEY);
+  const b64 = r[KEY_KEY] as string | undefined;
+  if (!b64) return null;
+  try {
+    return await crypto.subtle.importKey('raw', fromBase64(b64) as unknown as BufferSource, { name: 'AES-GCM' }, true, [
+      'encrypt',
+      'decrypt',
+    ]);
+  } catch {
+    return null;
+  }
+}
+
 export async function clearSession(): Promise<void> {
   if (!hasChrome) return;
-  await chrome.storage.session.remove([VAULT_KEY, TOKEN_KEY]);
+  await chrome.storage.session.remove([VAULT_KEY, TOKEN_KEY, KEY_KEY]);
 }
 
 export async function disconnect(): Promise<void> {
