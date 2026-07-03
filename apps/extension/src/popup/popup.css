@@ -193,6 +193,18 @@ body {
   padding: 2px 4px 8px;
 }
 
+.pop-cred-wrap {
+  border-radius: 10px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border: 1px solid transparent;
+}
+
+.pop-cred-wrap--open {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
 .pop-cred {
   display: flex;
   align-items: center;
@@ -200,6 +212,116 @@ body {
   padding: 9px 8px;
   border-radius: 10px;
   background: rgba(167, 139, 250, 0.1);
+}
+
+.pop-cred-wrap--open .pop-cred {
+  background: transparent;
+}
+
+.pop-cred-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+/* ===== Detalhe expandido da credencial ===== */
+.pop-detail {
+  padding: 4px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pop-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font-family: var(--font-body);
+}
+
+.pop-detail-row--pw {
+  cursor: default;
+}
+
+.pop-detail-label {
+  font-size: 9.5px;
+  color: var(--text-dim);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pop-detail-value {
+  font-size: 12.5px;
+  color: #f2f2f6;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pop-detail-value--mono {
+  font-family: var(--font-mono);
+  letter-spacing: 1px;
+}
+
+.pop-mini {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: #c1c1cf;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.pop-mini--accent {
+  background: rgba(167, 139, 250, 0.18);
+  color: #c4b5fd;
+}
+
+.pop-detail-2fa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(94, 123, 230, 0.14), rgba(167, 139, 250, 0.1));
+  border: 1px solid rgba(94, 123, 230, 0.28);
+  cursor: pointer;
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
+.pop-detail-2fa-code {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #eef;
+  margin-top: 2px;
 }
 
 .pop-cred-name {
@@ -296,4 +418,22 @@ body {
   font-weight: 700;
   letter-spacing: 2px;
   color: #f4f2ff;
+}
+
+/* ===== Toast de cópia ===== */
+.pop-copied {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1c1c28;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f2f2f6;
+  white-space: nowrap;
+  z-index: 50;
 }

@@ -18,6 +18,9 @@ import {
   CountdownRing,
   IconArrowRight,
   IconClock,
+  IconCopy,
+  IconEye,
+  IconEyeOff,
   IconPadlock,
   IconRefresh,
   IconSearch,
@@ -85,6 +88,33 @@ function TokenRow({ token, now }: { token: TotpToken; now: number }) {
   );
 }
 
+/** Código 2FA ao vivo de uma credencial, clicável para copiar. */
+function InlineTotp({ secret, now, onCopy }: { secret: string; now: number; onCopy: (code: string) => void }) {
+  const [code, setCode] = useState('');
+  const counter = totpCounter(now);
+  useEffect(() => {
+    generateTotp(secret, now).then((c) => setCode(formatTotp(c))).catch(() => setCode('——— ———'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secret, counter]);
+  const remaining = totpRemaining(now);
+  return (
+    <button type="button" className="pop-detail-2fa" onClick={() => onCopy(code.replace(' ', ''))}>
+      <div>
+        <div className="pop-detail-label">Código 2FA</div>
+        <div className="pop-detail-2fa-code">{code}</div>
+      </div>
+      <CountdownRing
+        size={28}
+        frac={remaining / TOTP_PERIOD}
+        remaining={remaining}
+        color={ringColor(remaining)}
+        fontSize={10}
+        periodKey={counter}
+      />
+    </button>
+  );
+}
+
 function Header({ children }: { children?: React.ReactNode }) {
   return (
     <div className="pop-header">
@@ -104,19 +134,41 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
   const host = useActiveTabHost();
   const [search, setSearch] = useState('');
   const [show2fa, setShow2fa] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState('');
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!show2fa) return;
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
-  }, [show2fa]);
 
   const forPage = useMemo(() => matchByHost(vault.credentials, host), [vault.credentials, host]);
   const q = search.trim().toLowerCase();
   const list = q
     ? vault.credentials.filter((c) => c.name.toLowerCase().includes(q) || c.domain.toLowerCase().includes(q))
     : forPage;
+
+  const openCred = openId ? vault.credentials.find((c) => c.id === openId) : undefined;
+  // Faz o relógio andar enquanto houver algum 2FA visível
+  const needTick = show2fa || !!openCred?.totpSecret;
+  useEffect(() => {
+    if (!needTick) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [needTick]);
+
+  const copy = (label: string, value: string) => {
+    navigator.clipboard?.writeText(value).then(
+      () => {
+        setCopied(`${label} copiado`);
+        setTimeout(() => setCopied(''), 1400);
+      },
+      () => {},
+    );
+  };
+
+  const toggleOpen = (id: string) => {
+    setOpenId((prev) => (prev === id ? null : id));
+    setRevealed(false);
+  };
 
   const fill = async (cred: Credential) => {
     if (typeof chrome === 'undefined' || !chrome.tabs) return;
@@ -150,16 +202,60 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
         {list.length === 0 && <div className="pop-empty">Nenhuma conta para {host || 'esta página'}</div>}
         {list.map((cred) => {
           const avatar = avatarFor(cred.id, cred.name);
+          const open = openId === cred.id;
           return (
-            <div className="pop-cred" key={cred.id} style={{ marginBottom: 6 }}>
-              <Avatar color={avatar.color} initial={avatar.initial} size={32} radius={9} fontSize={13} shadow={false} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="pop-cred-name">{cred.name}</div>
-                <div className="pop-cred-user">{cred.username}</div>
+            <div className={`pop-cred-wrap${open ? ' pop-cred-wrap--open' : ''}`} key={cred.id}>
+              <div className="pop-cred">
+                <button type="button" className="pop-cred-main" onClick={() => toggleOpen(cred.id)}>
+                  <Avatar color={avatar.color} initial={avatar.initial} size={32} radius={9} fontSize={13} shadow={false} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="pop-cred-name">{cred.name}</div>
+                    <div className="pop-cred-user">{cred.username}</div>
+                  </div>
+                </button>
+                <button type="button" className="pop-fill" onClick={() => fill(cred)} aria-label={`Preencher ${cred.name}`}>
+                  <IconArrowRight size={15} />
+                </button>
               </div>
-              <button type="button" className="pop-fill" onClick={() => fill(cred)} aria-label={`Preencher ${cred.name}`}>
-                <IconArrowRight size={15} />
-              </button>
+
+              {open && (
+                <div className="pop-detail">
+                  <button type="button" className="pop-detail-row" onClick={() => copy('Usuário', cred.username)}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="pop-detail-label">Usuário</div>
+                      <div className="pop-detail-value">{cred.username}</div>
+                    </div>
+                    <IconCopy size={16} style={{ color: '#9a9aad', flex: '0 0 auto' }} />
+                  </button>
+
+                  <div className="pop-detail-row pop-detail-row--pw">
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="pop-detail-label">Senha</div>
+                      <div className="pop-detail-value pop-detail-value--mono">
+                        {revealed ? cred.password : '•'.repeat(Math.min(cred.password.length, 16))}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="pop-mini"
+                      onClick={() => setRevealed((r) => !r)}
+                      aria-label={revealed ? 'Ocultar senha' : 'Revelar senha'}
+                    >
+                      {revealed ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                    </button>
+                    <button
+                      type="button"
+                      className="pop-mini pop-mini--accent"
+                      onClick={() => copy('Senha', cred.password)}
+                      aria-label="Copiar senha"
+                    >
+                      <IconCopy size={16} />
+                    </button>
+                  </div>
+
+                  {cred.totpSecret && <InlineTotp secret={cred.totpSecret} now={now} onCopy={(c) => copy('Código 2FA', c)} />}
+                </div>
+              )}
             </div>
           );
         })}
@@ -168,7 +264,7 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
           <button
             type="button"
             className="pop-action"
-            onClick={() => navigator.clipboard?.writeText(generatePassword(DEFAULT_GENERATOR_OPTIONS))}
+            onClick={() => copy('Senha gerada', generatePassword(DEFAULT_GENERATOR_OPTIONS))}
             title="Gerar e copiar senha forte"
           >
             <IconRefresh size={14} />
@@ -193,6 +289,8 @@ function UnlockedView({ vault, onLock, onRefresh, busy }: {
           </div>
         )}
       </div>
+
+      {copied && <div className="pop-copied">{copied}</div>}
     </div>
   );
 }
