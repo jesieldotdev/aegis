@@ -1,5 +1,6 @@
-/* Service worker do Aegis: cache-first para o app shell. */
-const CACHE = 'aegis-shell-v1';
+/* Service worker do Aegis: shell HTML network-first (nunca trava em versão
+ * antiga), assets com hash (Vite) cache-first (são imutáveis por nome). */
+const CACHE = 'aegis-shell-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -16,9 +17,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function isNavigation(request) {
+  return request.mode === 'navigate' || request.destination === 'document';
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) return;
+
+  if (isNavigation(request)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html'))),
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then(
       (cached) =>
