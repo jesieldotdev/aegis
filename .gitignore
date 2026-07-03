@@ -6,3 +6,4 @@ dist/
 .vite/
 dist-types/
 *.tsbuildinfo
+/.env

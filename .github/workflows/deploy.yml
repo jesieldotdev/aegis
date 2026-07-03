@@ -1,0 +1,19 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, aegis]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar variáveis de build da PWA
+        run: echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" > apps/pwa/.env
+
+      - name: Build e sobe o container
+        run: |
+          docker compose build pwa
+          docker compose up -d pwa
