@@ -5,6 +5,7 @@ import {
   downloadVaultEnvelope,
   encryptWithKey,
   fetchAccount,
+  mergeVaults,
   normalizeVault,
   uploadVaultEnvelope,
   type Credential,
@@ -150,9 +151,45 @@ export function useVault(): VaultController {
   );
 
   /**
+   * Sincroniza o cofre local com o Drive: baixa o remoto, faz merge por item
+   * (LWW, como o PWA) e envia o resultado. Devolve o cofre/envelope efetivos
+   * (já mesclados) para persistir localmente. Best-effort: sem token ou
+   * offline, devolve o próprio local.
+   */
+  const pushToDrive = useCallback(
+    async (key: CryptoKey, local: Vault, localEnv: EncryptedEnvelope): Promise<{ vault: Vault; env: EncryptedEnvelope }> => {
+      // Token da sessão ou, se ausente/expirado, renovação silenciosa pelo
+      // Chrome (getAuthToken interactive:false não abre nenhuma janela).
+      let token = await getSessionToken();
+      if (!token) {
+        token = await requestAccessToken(false);
+        await setSessionToken(token);
+      }
+
+      // Baixa o remoto e reconcilia; se decifra com a mesma chave, faz merge.
+      let merged = local;
+      const remote = await downloadVaultEnvelope(token);
+      if (remote) {
+        try {
+          const plaintext = await decryptWithKey(key, remote.iv, remote.ct);
+          merged = mergeVaults(local, normalizeVault(JSON.parse(plaintext) as Vault));
+        } catch {
+          // Remoto cifrado com outra senha-mestra: mantém o local (sem merge).
+          merged = local;
+        }
+      }
+
+      const { iv, ct } = await encryptWithKey(key, JSON.stringify(merged));
+      const mergedEnv: EncryptedEnvelope = { ...localEnv, iv, ct };
+      await uploadVaultEnvelope(token, mergedEnv);
+      return { vault: merged, env: mergedEnv };
+    },
+    [],
+  );
+
+  /**
    * Cria uma credencial: cifra o cofre atualizado com a chave da sessão,
-   * grava local e envia ao Drive (best-effort). O merge por item garante que
-   * o PWA reconcilie na próxima sincronização.
+   * grava local e sincroniza com o Drive (pull + merge + push).
    */
   const addCredential = useCallback(
     async (draft: Omit<Credential, 'id' | 'updatedAt'>): Promise<boolean> => {
@@ -168,23 +205,30 @@ export function useVault(): VaultController {
       const next = normalizeVault({ ...current, credentials: [...current.credentials, cred], updatedAt: now });
 
       const { iv, ct } = await encryptWithKey(key, JSON.stringify(next));
-      const nextEnv: EncryptedEnvelope = { ...env, iv, ct };
+      let nextEnv: EncryptedEnvelope = { ...env, iv, ct };
+      let effective = next;
 
+      // Grava local de imediato (não perde o item mesmo se o Drive falhar).
       await setStoredEnvelope(nextEnv);
       await setSessionVault(next);
       setEnvelope(nextEnv);
       setVault(next);
 
-      // Envia ao Drive se houver token na sessão (não interrompe o usuário).
+      // Sincroniza com o Drive; se conseguir, persiste a versão mesclada.
       try {
-        const token = await getSessionToken();
-        if (token) await uploadVaultEnvelope(token, nextEnv);
+        const synced = await pushToDrive(key, next, nextEnv);
+        effective = synced.vault;
+        nextEnv = synced.env;
+        await setStoredEnvelope(nextEnv);
+        await setSessionVault(effective);
+        setEnvelope(nextEnv);
+        setVault(effective);
       } catch {
-        // Sincroniza na próxima vez; o cofre local já está atualizado.
+        // Sem token/offline: o cofre local já está atualizado; sincroniza depois.
       }
       return true;
     },
-    [envelope],
+    [envelope, pushToDrive],
   );
 
   /** Puxa a versão mais recente do Drive e re-decifra com a chave em memória. */

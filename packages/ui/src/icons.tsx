@@ -139,6 +139,36 @@ export function IconEdit(props: IconProps) {
   );
 }
 
+export function IconNote(props: IconProps) {
+  return (
+    <svg {...base(props, { strokeWidth: 1.8 })}>
+      <path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z" />
+      <path d="M14 3v6h6" />
+      <path d="M8 13h6M8 17h4" />
+    </svg>
+  );
+}
+
+export function IconPin(props: IconProps) {
+  return (
+    <svg {...base(props, { strokeWidth: 1.8 })}>
+      <path d="M9 4h6l-1 7 3 3v1H7v-1l3-3-1-7z" />
+      <path d="M12 15v5" />
+    </svg>
+  );
+}
+
+export function IconTrash(props: IconProps) {
+  return (
+    <svg {...base(props, { strokeWidth: 1.8 })}>
+      <path d="M4 7h16" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" />
+      <path d="M9 7V4h6v3" />
+    </svg>
+  );
+}
+
 export function IconShare(props: IconProps) {
   return (
     <svg {...base(props, { strokeWidth: 1.9 })}>

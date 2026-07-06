@@ -1,7 +1,9 @@
 import {
   credKey,
+  noteKey,
   tokenKey,
   type Credential,
+  type Note,
   type Tombstones,
   type TotpToken,
   type Vault,
@@ -14,10 +16,17 @@ import {
 export function normalizeVault(input: Partial<Vault> & { profile: { name: string } }, now = Date.now()): Vault {
   const stampCred = (c: Credential): Credential => ({ ...c, updatedAt: c.updatedAt ?? now });
   const stampToken = (t: TotpToken): TotpToken => ({ ...t, updatedAt: t.updatedAt ?? now });
+  const stampNote = (n: Note): Note => ({
+    ...n,
+    color: n.color ?? 'default',
+    pinned: n.pinned ?? false,
+    updatedAt: n.updatedAt ?? now,
+  });
   return {
     profile: input.profile,
     credentials: (input.credentials ?? []).map(stampCred),
     tokens: (input.tokens ?? []).map(stampToken),
+    notes: (input.notes ?? []).map(stampNote),
     tombstones: input.tombstones ?? {},
     updatedAt: input.updatedAt ?? now,
   };
@@ -67,6 +76,7 @@ export function mergeVaults(a: Vault, b: Vault): Vault {
     profile: a.updatedAt >= b.updatedAt ? a.profile : b.profile,
     credentials: mergeItems<Credential>(a.credentials, b.credentials, tombstones, credKey),
     tokens: mergeItems<TotpToken>(a.tokens, b.tokens, tombstones, tokenKey),
+    notes: mergeItems<Note>(a.notes, b.notes, tombstones, noteKey),
     tombstones: pruneTombstones(tombstones),
     updatedAt: Math.max(a.updatedAt, b.updatedAt),
   };

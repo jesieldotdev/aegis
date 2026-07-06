@@ -20,6 +20,7 @@ import {
   generatePassword,
   importVault,
   isWebAuthnAvailable,
+  noteKey,
   normalizeVault,
   randomSalt,
   registerBiometric,
@@ -27,6 +28,7 @@ import {
   verifyBiometric,
   type Credential,
   type GeneratorOptions,
+  type Note,
   type TotpToken,
   type Vault,
 } from '@aegis/core';
@@ -55,7 +57,7 @@ import {
 } from './google';
 import { syncWithDrive } from './sync';
 
-export type Tab = 'vault' | '2fa' | 'gen' | 'settings';
+export type Tab = 'vault' | '2fa' | 'notes' | 'gen' | 'settings';
 export type Folder = 'Todos' | 'Pessoal' | 'Trabalho' | 'Financeiro';
 export type Phase = 'loading' | 'onboarding' | 'locked' | 'unlocked';
 
@@ -85,6 +87,8 @@ type AppState = {
   detailId: string | null;
   /** Item em edição: undefined = fechado, null = novo item. */
   editingId: string | null | undefined;
+  /** Nota em edição: undefined = fechada, null = nova nota. */
+  editingNoteId: string | null | undefined;
   addingToken: boolean;
   folder: Folder;
   search: string;
@@ -114,6 +118,11 @@ type AppState = {
   deleteCredential: (id: string) => void;
   addToken: (token: Omit<TotpToken, 'id' | 'updatedAt'>) => void;
   deleteToken: (id: string) => void;
+
+  openNote: (id: string | null) => void;
+  closeNote: () => void;
+  saveNote: (note: Note) => void;
+  deleteNote: (id: string) => void;
 
   setGenOpts: (patch: Partial<GeneratorOptions>) => void;
   regen: () => void;
@@ -147,6 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tab, setTabState] = useState<Tab>('vault');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null | undefined>(undefined);
+  const [editingNoteId, setEditingNoteId] = useState<string | null | undefined>(undefined);
   const [addingToken, setAddingToken] = useState(false);
   const [folder, setFolder] = useState<Folder>('Todos');
   const [search, setSearch] = useState('');
@@ -289,7 +299,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       kdfRef.current = { salt, iterations: PBKDF2_ITERATIONS };
       const fresh: Vault = seedDemo
         ? demoVault(profileName)
-        : { profile: { name: profileName }, credentials: [], tokens: [], tombstones: {}, updatedAt: Date.now() };
+        : { profile: { name: profileName }, credentials: [], tokens: [], notes: [], tombstones: {}, updatedAt: Date.now() };
       await persist(fresh);
       setVault(fresh);
       setPhase('unlocked');
@@ -368,6 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTabState('vault');
     setDetailId(null);
     setEditingId(undefined);
+    setEditingNoteId(undefined);
     setAddingToken(false);
     setRevealed(false);
     setBioReady(loadSettings().bio && hasWrappedVaultKey() && isWebAuthnAvailable());
@@ -405,6 +416,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const back = useCallback(() => setDetailId(null), []);
   const openEdit = useCallback((id: string | null) => setEditingId(id), []);
   const closeEdit = useCallback(() => setEditingId(undefined), []);
+  const openNote = useCallback((id: string | null) => setEditingNoteId(id), []);
+  const closeNote = useCallback(() => setEditingNoteId(undefined), []);
   const openAddToken = useCallback(() => setAddingToken(true), []);
   const closeAddToken = useCallback(() => setAddingToken(false), []);
   const toggleReveal = useCallback(() => setRevealed((r) => !r), []);
@@ -468,6 +481,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updatedAt: now,
       }));
       showToast('Token removido');
+    },
+    [mutateVault, showToast],
+  );
+
+  const saveNote = useCallback(
+    (note: Note) => {
+      const stamped = { ...note, updatedAt: Date.now() };
+      mutateVault((v) => {
+        const exists = v.notes.some((n) => n.id === stamped.id);
+        return {
+          ...v,
+          notes: exists
+            ? v.notes.map((n) => (n.id === stamped.id ? stamped : n))
+            : [...v.notes, stamped],
+          updatedAt: Date.now(),
+        };
+      });
+    },
+    [mutateVault],
+  );
+
+  const deleteNote = useCallback(
+    (id: string) => {
+      const now = Date.now();
+      mutateVault((v) => ({
+        ...v,
+        notes: v.notes.filter((n) => n.id !== id),
+        tombstones: { ...v.tombstones, [noteKey(id)]: now },
+        updatedAt: now,
+      }));
+      setEditingNoteId(undefined);
+      showToast('Nota excluída');
     },
     [mutateVault, showToast],
   );
@@ -653,24 +698,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(
     () => ({
       phase, vault, settings, google, bioReady, scanning, unlockError,
-      tab, detailId, editingId, addingToken, folder, search, revealed,
+      tab, detailId, editingId, editingNoteId, addingToken, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
       clearUnlockError: () => setUnlockError(''),
       setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
       setFolder, setSearch, toggleReveal,
       saveCredential, deleteCredential, addToken, deleteToken,
+      openNote, closeNote, saveNote, deleteNote,
       setGenOpts, regen,
       setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
       connectGoogle, disconnectGoogle, syncNow, restoreFromGoogle,
     }),
     [
       phase, vault, settings, google, bioReady, scanning, unlockError,
-      tab, detailId, editingId, addingToken, folder, search, revealed,
+      tab, detailId, editingId, editingNoteId, addingToken, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
       setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
       toggleReveal, saveCredential, deleteCredential, addToken, deleteToken,
+      openNote, closeNote, saveNote, deleteNote,
       setGenOpts, regen, setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
       connectGoogle, disconnectGoogle, syncNow, restoreFromGoogle,
     ],
