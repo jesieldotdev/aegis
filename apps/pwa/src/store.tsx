@@ -216,7 +216,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const key = keyRef.current;
     const kdf = kdfRef.current;
     const current = vaultRef.current;
-    if (!key || !kdf || !current || !loadGoogle() || !isGoogleConfigured()) return;
+    const account = loadGoogle();
+    if (!key || !kdf || !current || !account || !isGoogleConfigured()) return;
 
     if (!navigator.onLine) {
       setGoogle((g) => ({ ...g, status: 'offline' }));
@@ -227,10 +228,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!token) {
       // Sem token em cache (expirou ou a página recarregou): tenta um refresh
       // silencioso (prompt: '') — não abre o diálogo de consentimento. O
-      // auto-sync jamais escala para o login interativo; sem sessão válida,
-      // apenas ignora até uma ação explícita (Conectar/Sincronizar).
+      // `hint` com o e-mail já conectado evita o seletor de conta, deixando o
+      // GIS renovar pela sessão existente. Sem sessão válida, apenas ignora
+      // até uma ação explícita (Conectar/Sincronizar).
       try {
-        token = await getAccessToken(false);
+        token = await getAccessToken(false, account.email);
       } catch (err) {
         if (silent) return;
         setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
@@ -590,7 +592,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
     try {
-      const token = await getAccessToken(true);
+      // Reconexão: passa o e-mail lembrado para pré-selecionar a conta.
+      const token = await getAccessToken(true, loadGoogle()?.email);
       const account = await fetchAccount(token);
       const remembered: RememberedGoogle = { email: account.email, name: account.name, picture: account.picture };
       saveGoogle(remembered);
