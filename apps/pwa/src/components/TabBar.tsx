@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { AegisLogo, IconClock, IconGear, IconSliders, IconVaultDial } from '@aegis/ui';
+import { AegisLogo, IconClock, IconGear, IconNote, IconSliders, IconVaultDial } from '@aegis/ui';
 import { useApp, type Tab } from '../store';
 
 const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'vault', label: 'Cofre', icon: <IconVaultDial size={24} /> },
   { id: '2fa', label: '2FA', icon: <IconClock size={24} strokeWidth={1.9} /> },
+  { id: 'notes', label: 'Notas', icon: <IconNote size={24} /> },
   { id: 'gen', label: 'Gerador', icon: <IconSliders size={24} /> },
   { id: 'settings', label: 'Ajustes', icon: <IconGear size={24} /> },
 ];
