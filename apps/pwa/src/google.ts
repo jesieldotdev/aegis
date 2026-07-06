@@ -31,6 +31,8 @@ type Gsi = {
         client_id: string;
         scope: string;
         prompt?: string;
+        /** login_hint: e-mail da conta já usada, evita o seletor de conta. */
+        hint?: string;
         callback: (resp: TokenResponse) => void;
         error_callback?: (err: { type?: string }) => void;
       }) => TokenClient;
@@ -68,9 +70,10 @@ let cachedToken: { value: string; expiresAt: number } | null = null;
 
 /**
  * Obtém um access token. `interactive` mostra o consentimento (primeira
- * conexão); depois tenta silenciosamente (`prompt: ''`).
+ * conexão); depois tenta silenciosamente (`prompt: ''`). Passe `hint` (e-mail
+ * da conta já conectada) para o GIS renovar sem exibir o seletor de conta.
  */
-export async function getAccessToken(interactive: boolean): Promise<string> {
+export async function getAccessToken(interactive: boolean, hint?: string): Promise<string> {
   if (!isGoogleConfigured()) throw new Error('Google Client ID não configurado');
   if (cachedToken && cachedToken.expiresAt - 60_000 > Date.now()) return cachedToken.value;
 
@@ -79,6 +82,7 @@ export async function getAccessToken(interactive: boolean): Promise<string> {
     const client = gis.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID!,
       scope: DRIVE_SCOPES,
+      hint: hint || undefined,
       callback: (resp) => {
         if (resp.error || !resp.access_token) return reject(new Error(resp.error || 'Sem token'));
         cachedToken = { value: resp.access_token, expiresAt: Date.now() + resp.expires_in * 1000 };
