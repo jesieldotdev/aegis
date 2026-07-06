@@ -163,22 +163,37 @@ button {
 
 .lock-bio-face {
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: 104px;
+  height: 104px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  color: #c1c1cf;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(167, 139, 250, 0.18), transparent 68%),
+    rgba(255, 255, 255, 0.035);
+  border: 1.5px solid rgba(167, 139, 250, 0.28);
+  box-shadow: 0 10px 30px rgba(124, 58, 237, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #d8ccff;
   transition: all 0.35s;
   overflow: hidden;
 }
 
-.lock-bio--scanning .lock-bio-face {
-  background: rgba(167, 139, 250, 0.14);
+.lock-bio:hover .lock-bio-face {
   border-color: rgba(167, 139, 250, 0.5);
+  box-shadow: 0 12px 36px rgba(124, 58, 237, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #ede8ff;
+}
+
+.lock-bio:active .lock-bio-face {
+  transform: scale(0.96);
+}
+
+.lock-bio--scanning .lock-bio-face {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(167, 139, 250, 0.3), transparent 70%),
+    rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.6);
   color: var(--accent);
 }
 
@@ -1040,6 +1055,11 @@ button {
   font-weight: 600;
 }
 
+/* Marca da sidebar — só no desktop */
+.tabbar-brand {
+  display: none;
+}
+
 /* ===== Toast ===== */
 .toast {
   position: absolute;
@@ -1330,6 +1350,43 @@ button {
   margin-top: 9px;
 }
 
+.ed-2fa-links {
+  display: flex;
+  gap: 7px;
+  margin-top: 9px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.ed-2fa-links::-webkit-scrollbar {
+  display: none;
+}
+
+.ed-2fa-chip {
+  flex: 0 0 auto;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  color: #9a9aab;
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+  font-family: var(--font-body);
+}
+
+.ed-2fa-chip--active {
+  background: var(--accent-tint);
+  color: #d8ccff;
+  border-color: rgba(167, 139, 250, 0.35);
+}
+
 .action-btn--primary {
   background: var(--accent-grad);
   border-color: transparent;
@@ -1408,6 +1465,103 @@ button {
 .gen-toggles,
 .gen-mode {
   animation: aeg-pop 0.24s both;
+}
+
+/* ===== Desktop: janela de app + navegação lateral (não afeta o mobile) ===== */
+@media (min-width: 860px) {
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    padding: 28px;
+    box-sizing: border-box;
+  }
+
+  #root {
+    height: auto;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .app {
+    height: min(880px, calc(100dvh - 56px));
+    width: 100%;
+    max-width: 1080px;
+    border-radius: 26px;
+    border: 1px solid var(--border);
+    box-shadow: 0 40px 130px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Tab bar inferior vira barra lateral fixa à esquerda */
+  .app-body {
+    flex-direction: row;
+  }
+
+  .app-body > .screen {
+    min-width: 0;
+  }
+
+  .tabbar {
+    position: relative;
+    order: -1;
+    flex: 0 0 236px;
+    height: 100%;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 4px;
+    padding: 22px 16px;
+    background: rgba(255, 255, 255, 0.015);
+    border-right: 1px solid var(--border);
+    backdrop-filter: none;
+  }
+
+  .tabbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 6px 10px 20px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  .tabbar-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 13px;
+    padding: 11px 14px;
+    border-radius: 12px;
+  }
+
+  .tabbar-item span {
+    font-size: 14.5px;
+  }
+
+  .tabbar-item--active {
+    background: var(--accent-tint);
+    color: #d8ccff;
+  }
+
+  .tabbar-item:hover:not(.tabbar-item--active) {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+  }
+
+  .tabbar-item:active {
+    transform: none;
+  }
+
+  /* Sem status bar do celular: aproxima o conteúdo do topo */
+  .screen-header,
+  .vault-header,
+  .detail-nav {
+    padding-top: 30px;
+  }
 }
 
 /* ===== Acessibilidade ===== */

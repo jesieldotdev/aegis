@@ -464,23 +464,23 @@ body {
   border: 1px solid rgba(167, 139, 250, 0.22);
 }
 
-.pop-new-pass-value {
+.pop-new-pass-input {
   flex: 1;
   min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
   font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 600;
   color: #f4f2ff;
-  word-break: break-all;
   line-height: 1.4;
+  padding: 0;
 }
 
-.pop-new-pass-value .g-num {
-  color: var(--info-2fa);
-}
-
-.pop-new-pass-value .g-sym {
-  color: var(--success);
+.pop-new-pass-input::placeholder {
+  color: var(--text-dim);
+  font-weight: 500;
 }
 
 .pop-new-pass-actions {

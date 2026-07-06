@@ -16,6 +16,7 @@ const CATEGORIES: Category[] = ['Pessoal', 'Trabalho', 'Financeiro'];
 export function EditItem() {
   const { vault, editingId, closeEdit, saveCredential, deleteCredential } = useApp();
   const existing = editingId ? vault?.credentials.find((c) => c.id === editingId) : undefined;
+  const tokens = vault?.tokens ?? [];
 
   const [name, setName] = useState(existing?.name ?? '');
   const [domain, setDomain] = useState(existing?.domain ?? '');
@@ -134,12 +135,30 @@ export function EditItem() {
 
         <div className="field-card">
           <label className="field-label" htmlFor="ed-totp">Segredo 2FA (opcional)</label>
+          {tokens.length > 0 && (
+            <div className="ed-2fa-links">
+              {tokens.map((t) => {
+                const active = totpInput.trim().toUpperCase() === t.secret.toUpperCase();
+                return (
+                  <button
+                    type="button"
+                    key={t.id}
+                    className={`ed-2fa-chip${active ? ' ed-2fa-chip--active' : ''}`}
+                    onClick={() => { setTotpInput(active ? '' : t.secret); setError(''); }}
+                    title={t.account ? `${t.issuer} — ${t.account}` : t.issuer}
+                  >
+                    {t.issuer || t.account || '2FA'}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <input
             id="ed-totp"
             className="ed-input ed-input--mono"
             value={totpInput}
             onChange={(e) => { setTotpInput(e.target.value); setError(''); }}
-            placeholder="Base32 ou otpauth://totp/…"
+            placeholder="Vincule acima ou cole Base32 / otpauth://totp/…"
             autoCapitalize="none"
             style={totpInput && !parseOtpAuth(totpInput) && !isValidSecret(totpInput) ? { color: 'var(--danger)' } : undefined}
           />

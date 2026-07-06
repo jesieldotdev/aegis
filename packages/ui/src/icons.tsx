@@ -18,15 +18,16 @@ function base({ size = 24, ...rest }: IconProps, defaults: Partial<SVGProps<SVGS
 
 export function IconFingerprint(props: IconProps) {
   return (
-    <svg {...base(props, { strokeWidth: 1.6 })}>
-      <path d="M12 10a2 2 0 00-2 2c0 1.8-.3 3.5-1 5" />
-      <path d="M8.7 3.7A6 6 0 0118 9v1c0 .7 0 1.4-.1 2" />
-      <path d="M2.3 9.5A6 6 0 016 4.6" />
-      <path d="M6 12a6 6 0 016-6c.7 0 1.4.1 2 .4" />
-      <path d="M13 17.5c-.3.9-.6 1.8-1 2.5" />
-      <path d="M17 15.5a25 25 0 01-.9 3.5" />
-      <path d="M6 15a13 13 0 01-2 5" />
-      <path d="M12 12v1a25 25 0 01-.5 5" />
+    <svg {...base(props, { strokeWidth: 1.8 })}>
+      <path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4" />
+      <path d="M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2" />
+      <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+      <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+      <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+      <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+      <path d="M2 16h.01" />
+      <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+      <path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2" />
     </svg>
   );
 }

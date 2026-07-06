@@ -166,6 +166,7 @@ function NewAccountPanel({
   const [username, setUsername] = useState('');
   const [domain, setDomain] = useState(host);
   const [category, setCategory] = useState<Category>('Pessoal');
+  const [showPass, setShowPass] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -190,17 +191,20 @@ function NewAccountPanel({
   return (
     <div className="pop-new">
       <div className="pop-new-pass">
-        <div className="pop-new-pass-value">
-          {password.split('').map((ch, i) => {
-            const cls = /[0-9]/.test(ch) ? 'g-num' : /[^a-zA-Z0-9]/.test(ch) ? 'g-sym' : undefined;
-            return (
-              <span key={i} className={cls}>
-                {ch}
-              </span>
-            );
-          })}
-        </div>
+        <input
+          className="pop-new-pass-input"
+          type={showPass ? 'text' : 'password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Senha"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
         <div className="pop-new-pass-actions">
+          <button type="button" className="pop-mini" onClick={() => setShowPass((s) => !s)} title={showPass ? 'Ocultar' : 'Mostrar'}>
+            {showPass ? <IconEyeOff size={15} /> : <IconEye size={15} />}
+          </button>
           <button type="button" className="pop-mini" onClick={() => setPassword(generatePassword(DEFAULT_GENERATOR_OPTIONS))} title="Gerar outra">
             <IconRefresh size={15} />
           </button>

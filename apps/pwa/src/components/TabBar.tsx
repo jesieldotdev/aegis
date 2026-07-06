@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { IconClock, IconGear, IconSliders, IconVaultDial } from '@aegis/ui';
+import { AegisLogo, IconClock, IconGear, IconSliders, IconVaultDial } from '@aegis/ui';
 import { useApp, type Tab } from '../store';
 
 const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
@@ -14,6 +14,10 @@ export function TabBar() {
 
   return (
     <nav className="tabbar">
+      <div className="tabbar-brand" aria-hidden>
+        <AegisLogo size={34} iconSize={18} radius={11} />
+        <span>Aegis</span>
+      </div>
       {TABS.map((t) => (
         <button
           type="button"
