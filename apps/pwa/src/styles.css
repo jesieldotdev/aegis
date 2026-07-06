@@ -262,6 +262,16 @@ button {
   padding: 0;
 }
 
+.icon-btn--spin svg {
+  animation: aeg-spin 0.8s linear infinite;
+}
+
+@keyframes aeg-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .vault-avatar {
   width: 40px;
   height: 40px;

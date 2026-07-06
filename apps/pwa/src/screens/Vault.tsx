@@ -5,6 +5,7 @@ import {
   IconClock,
   IconKey,
   IconQrPlus,
+  IconRefresh,
   IconSearch,
 } from '@aegis/ui';
 import { avatarFor, estimateStrength, strengthMeta } from '@aegis/core';
@@ -18,7 +19,7 @@ const FOLDERS: { id: Folder; dot: string }[] = [
 ];
 
 export function Vault() {
-  const { vault, folder, setFolder, search, setSearch, openDetail, openEdit } = useApp();
+  const { vault, folder, setFolder, search, setSearch, openDetail, openEdit, google, syncNow } = useApp();
   if (!vault) return null;
   const { credentials, profile } = vault;
 
@@ -47,6 +48,18 @@ export function Vault() {
           <div className="screen-title">Cofre</div>
         </div>
         <div className="vault-header-actions">
+          {google.account && (
+            <button
+              type="button"
+              className={`icon-btn${google.status === 'syncing' ? ' icon-btn--spin' : ''}`}
+              aria-label="Recarregar do Drive"
+              title="Recarregar do Drive"
+              disabled={google.status === 'syncing'}
+              onClick={() => void syncNow()}
+            >
+              <IconRefresh size={18} />
+            </button>
+          )}
           <button type="button" className="icon-btn" aria-label="Adicionar item" onClick={() => openEdit(null)}>
             <IconQrPlus size={19} />
           </button>

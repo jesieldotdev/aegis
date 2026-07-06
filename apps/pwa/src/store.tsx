@@ -304,10 +304,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPhase('unlocked');
       setTabState('vault');
       setDetailId(null);
-      // Puxa do Drive ao desbloquear (se conectado)
-      if (loadGoogle() && isGoogleConfigured()) setTimeout(() => void runSync(true), 300);
+      // Sem pull automático ao desbloquear: o merge remoto re-renderizava a
+      // tela e causava um "flash" logo após entrar. A atualização a partir do
+      // Drive fica sob demanda, no botão de recarregar do Cofre.
     },
-    [runSync],
+    [],
   );
 
   const unlockWithPassword = useCallback(
