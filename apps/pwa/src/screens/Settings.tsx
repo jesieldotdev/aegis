@@ -201,6 +201,12 @@ export function Settings() {
           <IconPadlock size={18} />
           Bloquear cofre
         </button>
+
+        <div className="set-legal">
+          <a href="/privacidade">Política de Privacidade</a>
+          <span aria-hidden>·</span>
+          <a href="/termos">Termos de Uso</a>
+        </div>
       </div>
     </div>
   );
