@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="index, follow" />
+<title>Política de Privacidade — Aegis</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(120% 60% at 50% -8%, #1a1330 0%, transparent 46%), #0a0a11;
+    color: #e9e9f0;
+    font-family: 'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 22px 80px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 13px;
+    background: linear-gradient(145deg, #a78bfa, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.4);
+  }
+  .brand b { font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }
+  h1 { font-size: 28px; letter-spacing: -0.5px; margin: 0 0 6px; }
+  .meta { color: #8b8b9c; font-size: 14px; margin-bottom: 34px; }
+  h2 { font-size: 18px; margin: 34px 0 10px; color: #c9bfff; }
+  p, li { color: #c4c4d2; font-size: 15.5px; }
+  a { color: #a78bfa; }
+  ul { padding-left: 20px; }
+  li { margin: 6px 0; }
+  .card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; padding: 16px 18px; margin: 18px 0;
+  }
+  .card strong { color: #e9e9f0; }
+  footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); color: #6a6a7a; font-size: 13.5px; }
+  footer a { color: #8b8b9c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <span class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2.5l7 3v5.5c0 4.6-3 8.4-7 9.9-4-1.5-7-5.3-7-9.9V5.5l7-3z" fill="#fff" fill-opacity=".18" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M9 11.8l2.1 2.1L15.2 9.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <b>Aegis</b>
+  </div>
+
+  <h1>Política de Privacidade</h1>
+  <div class="meta">Última atualização: 6 de julho de 2026</div>
+
+  <p>A Aegis é um gerenciador de senhas e autenticador 2FA. Esta política explica quais dados o aplicativo e a extensão tratam e como. O princípio é simples: <strong>seus dados sensíveis são cifrados no seu dispositivo e nós não temos acesso a eles</strong>.</p>
+
+  <div class="card">
+    <strong>Resumo em uma frase:</strong> não coletamos, não vendemos e não compartilhamos seus dados. Seu cofre é cifrado localmente e armazenado na sua própria conta do Google Drive — só você tem a chave.
+  </div>
+
+  <h2>1. Dados que o aplicativo trata</h2>
+  <ul>
+    <li><strong>Conteúdo do cofre</strong> — credenciais (nome, domínio, usuário, senha), segredos de 2FA (TOTP) e notas. Esses dados são cifrados com <strong>AES-256-GCM</strong> usando uma chave derivada da sua senha-mestra (PBKDF2). A chave e a senha-mestra <strong>nunca saem do seu dispositivo</strong> e não são transmitidas a nós nem a terceiros.</li>
+    <li><strong>Dados da sua conta Google</strong> — ao conectar o Google, exibimos seu nome, e-mail e foto de perfil apenas para identificação na interface. Não os utilizamos para nenhum outro fim.</li>
+  </ul>
+
+  <h2>2. Onde os dados ficam armazenados</h2>
+  <ul>
+    <li><strong>No seu dispositivo</strong> — o cofre cifrado fica no armazenamento local do navegador.</li>
+    <li><strong>No seu Google Drive</strong> — uma cópia cifrada é salva em uma pasta privada do aplicativo (<em>appDataFolder</em>), acessível apenas por este aplicativo dentro da sua conta. O arquivo é gravado <strong>já cifrado</strong>; ninguém consegue lê-lo sem a sua senha-mestra.</li>
+  </ul>
+  <p>Não operamos servidores que armazenem o seu cofre. A sincronização acontece diretamente entre o seu dispositivo e o seu Google Drive.</p>
+
+  <h2>3. Permissões e escopos do Google</h2>
+  <p>Solicitamos o mínimo necessário para o funcionamento:</p>
+  <ul>
+    <li><strong>drive.appdata</strong> — ler e gravar apenas o arquivo cifrado do cofre na pasta privada do app. Não acessamos nenhum outro arquivo do seu Drive.</li>
+    <li><strong>userinfo.email / userinfo.profile</strong> — exibir sua conta na interface.</li>
+    <li><strong>Extensão do navegador:</strong> <em>activeTab</em> (preencher a aba ativa quando você pede), <em>clipboardWrite</em> (copiar senhas/códigos), <em>identity</em> (login com Google) e <em>storage</em> (guardar o cofre cifrado localmente).</li>
+  </ul>
+
+  <div class="card">
+    <strong>Uso Limitado (Google API Services):</strong> o uso das informações recebidas das APIs do Google pela Aegis adere à
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Política de Dados do Usuário dos Serviços de API do Google</a>,
+    incluindo os requisitos de Uso Limitado. Os dados do Google Drive são usados exclusivamente para armazenar e sincronizar o seu cofre cifrado, não são transferidos a terceiros e não são usados para publicidade.
+  </div>
+
+  <h2>4. O que NÃO fazemos</h2>
+  <ul>
+    <li>Não coletamos análises de uso, rastreadores ou identificadores de publicidade.</li>
+    <li>Não vendemos nem compartilhamos seus dados com terceiros.</li>
+    <li>Não temos acesso ao conteúdo do seu cofre — o modelo é de conhecimento zero (<em>zero-knowledge</em>).</li>
+  </ul>
+
+  <h2>5. Exclusão dos seus dados</h2>
+  <ul>
+    <li><strong>Desconectar</strong> o Google no aplicativo revoga o acesso e remove a sessão local.</li>
+    <li>Você pode excluir o arquivo do cofre da pasta do app diretamente no seu Google Drive.</li>
+    <li>Limpar os dados do site/extensão no navegador remove a cópia local.</li>
+  </ul>
+  <p><strong>Importante:</strong> a senha-mestra não pode ser recuperada. Se você a perder, o conteúdo cifrado se torna permanentemente inacessível — inclusive para nós.</p>
+
+  <h2>6. Segurança</h2>
+  <p>Empregamos criptografia AES-256-GCM em repouso e derivação de chave com PBKDF2. Ainda assim, nenhum método é 100% infalível; mantenha sua senha-mestra segura e seu dispositivo protegido.</p>
+
+  <h2>7. Alterações nesta política</h2>
+  <p>Podemos atualizar esta política periodicamente. A data de "última atualização" no topo indica a versão vigente.</p>
+
+  <h2>8. Contato</h2>
+  <p>Dúvidas sobre privacidade: <a href="mailto:jesiel364@gmail.com">jesiel364@gmail.com</a>.</p>
+
+  <footer>
+    Aegis · <a href="/termos">Termos de Uso</a> · <a href="/">Voltar ao aplicativo</a>
+  </footer>
+</div>
+</body>
+</html>
