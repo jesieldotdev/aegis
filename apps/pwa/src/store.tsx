@@ -225,10 +225,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     let token = getCachedToken();
     if (!token) {
-      if (silent) return; // auto-sync jamais interrompe com o login do Google
+      // Sem token em cache (expirou ou a página recarregou): tenta um refresh
+      // silencioso (prompt: '') — não abre o diálogo de consentimento. O
+      // auto-sync jamais escala para o login interativo; sem sessão válida,
+      // apenas ignora até uma ação explícita (Conectar/Sincronizar).
       try {
         token = await getAccessToken(false);
       } catch (err) {
+        if (silent) return;
         setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
         showToast('Falha na sincronização');
         return;
