@@ -117,9 +117,26 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   padding: 0 40px;
   text-align: center;
+}
+
+/* Bloco superior: logo/nome/subtítulo, um pouco abaixo do topo */
+.lock-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20vh;
+}
+
+/* Bloco inferior: componente de desbloqueio na zona do polegar */
+.lock-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding-bottom: 40px;
 }
 
 .lock-logo {
@@ -149,7 +166,6 @@ button {
 }
 
 .lock-bio {
-  margin-top: 52px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -219,8 +235,7 @@ button {
 }
 
 .lock-footer {
-  margin-top: auto;
-  margin-bottom: 46px;
+  margin-top: 28px;
   display: flex;
   align-items: center;
   gap: 8px;
