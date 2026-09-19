@@ -49,6 +49,17 @@ declare global {
 
 let gisPromise: Promise<Gsi> | null = null;
 
+/**
+ * Carrega o script do GIS antecipadamente (ex.: ao montar a tela), sem
+ * esperar um clique. `requestAccessToken` precisa rodar dentro do próprio
+ * gesto do usuário (clique/tap) para abrir o popup — se o script ainda
+ * estiver carregando nesse momento, o `await` quebra essa cadeia e o
+ * navegador (principalmente no Chrome Android) fecha o popup imediatamente.
+ */
+export function preloadGis(): Promise<Gsi> {
+  return loadGis();
+}
+
 function loadGis(): Promise<Gsi> {
   gisPromise ??= new Promise<Gsi>((resolve, reject) => {
     if (window.google?.accounts?.oauth2) return resolve(window.google);

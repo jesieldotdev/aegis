@@ -54,6 +54,7 @@ import {
   getAccessToken,
   getCachedToken,
   isGoogleConfigured,
+  preloadGis,
 } from './google';
 import { syncWithDrive } from './sync';
 
@@ -187,6 +188,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBioReady(stored.bio && hasWrappedVaultKey() && isWebAuthnAvailable());
     setGoogle((g) => ({ ...g, account: loadGoogle() }));
     setPhase(envelope ? 'locked' : 'onboarding');
+  }, []);
+
+  // Carrega o script do Google Identity Services de antemão: se ele só
+  // começar a carregar no clique do botão "Entrar com Google", o popup de
+  // autorização abre fora do gesto do usuário e é fechado na hora.
+  useEffect(() => {
+    if (isGoogleConfigured()) preloadGis().catch(() => {});
   }, []);
 
   const showToast = useCallback((msg: string) => {
