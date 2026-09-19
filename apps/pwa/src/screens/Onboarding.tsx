@@ -5,7 +5,7 @@ import { useApp } from '../store';
 
 /** Primeira execução: cria o cofre e define a senha-mestra. */
 export function Onboarding() {
-  const { createVault, google, restoreFromGoogle } = useApp();
+  const { createVault, restoreFromGoogle } = useApp();
   const [restoring, setRestoring] = useState(false);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -100,27 +100,23 @@ export function Onboarding() {
         </button>
       </form>
 
-      {google.configured && (
-        <>
-          <div className="ob-divider"><span>ou</span></div>
-          <button
-            type="button"
-            className="ob-restore"
-            disabled={restoring || creating}
-            onClick={async () => {
-              setRestoring(true);
-              try {
-                await restoreFromGoogle();
-              } finally {
-                setRestoring(false);
-              }
-            }}
-          >
-            <IconGoogle size={17} />
-            {restoring ? 'Buscando cofre…' : 'Já tenho um cofre — entrar com Google'}
-          </button>
-        </>
-      )}
+      <div className="ob-divider"><span>ou</span></div>
+      <button
+        type="button"
+        className="ob-restore"
+        disabled={restoring || creating}
+        onClick={async () => {
+          setRestoring(true);
+          try {
+            await restoreFromGoogle();
+          } finally {
+            setRestoring(false);
+          }
+        }}
+      >
+        <IconGoogle size={17} />
+        {restoring ? 'Buscando cofre…' : 'Já tenho um cofre — entrar com Google'}
+      </button>
     </div>
   );
 }
