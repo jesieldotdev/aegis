@@ -17,10 +17,15 @@ export {
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
+const AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
+const REDIRECT_STATE_KEY = 'aegis-google-redirect';
 
 export function isGoogleConfigured(): boolean {
   return typeof CLIENT_ID === 'string' && CLIENT_ID.length > 0;
 }
+
+/** O que estava em andamento quando caímos para o fluxo de redirect. */
+export type GoogleAuthIntent = 'connect' | 'restore';
 
 type TokenResponse = { access_token: string; expires_in: number; error?: string };
 type TokenClient = { requestAccessToken: (opts?: { prompt?: string }) => void };
@@ -80,11 +85,84 @@ function loadGis(): Promise<Gsi> {
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
 /**
+ * Em PWAs instaladas (modo standalone, comum no Android) o navegador bloqueia
+ * o `window.open` do popup do GIS — ele nem chega a abrir, e o GIS reporta
+ * `popup_failed_to_open` no `error_callback`. A única saída nesse caso é
+ * navegar a própria janela até o Google (fluxo de redirect) e voltar com o
+ * token na URL depois do consentimento.
+ */
+function redirectUri(): string {
+  return `${window.location.origin}/`;
+}
+
+function buildAuthUrl(hint: string | undefined, state: string): string {
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID!,
+    redirect_uri: redirectUri(),
+    response_type: 'token',
+    scope: DRIVE_SCOPES,
+    include_granted_scopes: 'true',
+    prompt: 'consent',
+    state,
+  });
+  if (hint) params.set('login_hint', hint);
+  return `${AUTH_ENDPOINT}?${params.toString()}`;
+}
+
+function beginRedirectAuth(intent: GoogleAuthIntent, hint?: string): void {
+  const state = crypto.randomUUID();
+  sessionStorage.setItem(REDIRECT_STATE_KEY, JSON.stringify({ intent, state }));
+  window.location.assign(buildAuthUrl(hint, state));
+}
+
+export type RedirectAuthResult =
+  | { status: 'ok'; token: string; intent: GoogleAuthIntent }
+  | { status: 'error'; message: string; intent: GoogleAuthIntent | null };
+
+/**
+ * Lê o retorno do fluxo de redirect (se houver) e limpa a URL/o estado
+ * temporário. Precisa ser chamado uma vez ao montar o app — é isso que
+ * fecha o ciclo aberto por `beginRedirectAuth` depois do reload.
+ */
+export function consumeRedirectAuth(): RedirectAuthResult | null {
+  const hash = window.location.hash;
+  if (!hash || (!hash.includes('access_token=') && !hash.includes('error='))) return null;
+
+  const raw = sessionStorage.getItem(REDIRECT_STATE_KEY);
+  sessionStorage.removeItem(REDIRECT_STATE_KEY);
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+
+  let pending: { intent: GoogleAuthIntent; state: string } | null = null;
+  try {
+    pending = raw ? JSON.parse(raw) : null;
+  } catch {
+    pending = null;
+  }
+
+  const params = new URLSearchParams(hash.slice(1));
+  const error = params.get('error');
+  if (error) return { status: 'error', message: error, intent: pending?.intent ?? null };
+
+  const token = params.get('access_token');
+  const expiresIn = Number(params.get('expires_in') ?? '0');
+  if (!token || !pending || params.get('state') !== pending.state) return null;
+
+  cachedToken = { value: token, expiresAt: Date.now() + expiresIn * 1000 };
+  return { status: 'ok', token, intent: pending.intent };
+}
+
+/**
  * Obtém um access token. `interactive` mostra o consentimento (primeira
  * conexão); depois tenta silenciosamente (`prompt: ''`). Passe `hint` (e-mail
  * da conta já conectada) para o GIS renovar sem exibir o seletor de conta.
+ * `intent` só importa se o popup falhar: é o que permite retomar a ação certa
+ * (conectar ou restaurar) quando a página recarregar depois do redirect.
  */
-export async function getAccessToken(interactive: boolean, hint?: string): Promise<string> {
+export async function getAccessToken(
+  interactive: boolean,
+  hint?: string,
+  intent?: GoogleAuthIntent,
+): Promise<string> {
   if (!isGoogleConfigured()) throw new Error('Google Client ID não configurado');
   if (cachedToken && cachedToken.expiresAt - 60_000 > Date.now()) return cachedToken.value;
 
@@ -99,7 +177,13 @@ export async function getAccessToken(interactive: boolean, hint?: string): Promi
         cachedToken = { value: resp.access_token, expiresAt: Date.now() + resp.expires_in * 1000 };
         resolve(resp.access_token);
       },
-      error_callback: (err) => reject(new Error(err.type || 'Autorização cancelada')),
+      error_callback: (err) => {
+        if (err.type === 'popup_failed_to_open' && intent) {
+          beginRedirectAuth(intent, hint);
+          return; // a janela está navegando para o Google; a promise fica pendente
+        }
+        reject(new Error(err.type || 'Autorização cancelada'));
+      },
     });
     client.requestAccessToken({ prompt: interactive ? 'consent' : '' });
   });

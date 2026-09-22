@@ -49,6 +49,7 @@ import {
 } from './storage';
 import {
   clearToken,
+  consumeRedirectAuth,
   downloadVault,
   fetchAccount,
   getAccessToken,
@@ -639,6 +640,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ---------- Google Drive ----------
 
+  /**
+   * Passos depois de já ter o token. Fica separado de `connectGoogle` porque
+   * também é usado ao retomar a conexão após o fluxo de redirect (PWAs
+   * instaladas, onde o popup do Google é bloqueado pelo navegador e a volta
+   * acontece num reload da página, não no mesmo clique).
+   */
+  const finishConnect = useCallback(
+    async (token: string) => {
+      try {
+        const account = await fetchAccount(token);
+        const remembered: RememberedGoogle = { email: account.email, name: account.name, picture: account.picture };
+        saveGoogle(remembered);
+        setGoogle((g) => ({ ...g, account: remembered }));
+        await runSync(false);
+        showToast(`Conectado como ${account.email}`);
+      } catch (err) {
+        setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
+        showToast('Não foi possível conectar ao Google');
+      }
+    },
+    [runSync, showToast],
+  );
+
   const connectGoogle = useCallback(async () => {
     if (!isGoogleConfigured()) {
       showToast('Configure o VITE_GOOGLE_CLIENT_ID');
@@ -647,18 +671,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
     try {
       // Reconexão: passa o e-mail lembrado para pré-selecionar a conta.
-      const token = await getAccessToken(true, loadGoogle()?.email);
-      const account = await fetchAccount(token);
-      const remembered: RememberedGoogle = { email: account.email, name: account.name, picture: account.picture };
-      saveGoogle(remembered);
-      setGoogle((g) => ({ ...g, account: remembered }));
-      await runSync(false);
-      showToast(`Conectado como ${account.email}`);
+      const token = await getAccessToken(true, loadGoogle()?.email, 'connect');
+      await finishConnect(token);
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
       showToast('Não foi possível conectar ao Google');
     }
-  }, [runSync, showToast]);
+  }, [finishConnect, showToast]);
 
   const disconnectGoogle = useCallback(() => {
     clearToken();
@@ -675,6 +694,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
    * existente e vai para a tela de bloqueio (a senha-mestra decifra em seguida).
    * Assim não é preciso "criar cofre" toda vez.
    */
+  const finishRestore = useCallback(
+    async (token: string) => {
+      try {
+        const account = await fetchAccount(token);
+        const envelope = await downloadVault(token);
+        if (!envelope) {
+          setGoogle((g) => ({ ...g, status: 'idle' }));
+          showToast('Nenhum cofre no Drive desta conta — crie um');
+          return;
+        }
+        const remembered: RememberedGoogle = { email: account.email, name: account.name, picture: account.picture };
+        saveVaultEnvelope(envelope);
+        saveGoogle(remembered);
+        setGoogle((g) => ({ ...g, account: remembered, status: 'synced', lastSync: Date.now() }));
+        setBioReady(false); // biometria precisa ser reconfigurada neste aparelho
+        setPhase('locked');
+        showToast('Cofre encontrado — digite a senha-mestra');
+      } catch (err) {
+        setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
+        showToast('Não foi possível conectar ao Google');
+      }
+    },
+    [showToast],
+  );
+
   const restoreFromGoogle = useCallback(async () => {
     if (!isGoogleConfigured()) {
       showToast('Configure o VITE_GOOGLE_CLIENT_ID');
@@ -682,26 +726,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
     try {
-      const token = await getAccessToken(true);
-      const account = await fetchAccount(token);
-      const envelope = await downloadVault(token);
-      if (!envelope) {
-        setGoogle((g) => ({ ...g, status: 'idle' }));
-        showToast('Nenhum cofre no Drive desta conta — crie um');
-        return;
-      }
-      const remembered: RememberedGoogle = { email: account.email, name: account.name, picture: account.picture };
-      saveVaultEnvelope(envelope);
-      saveGoogle(remembered);
-      setGoogle((g) => ({ ...g, account: remembered, status: 'synced', lastSync: Date.now() }));
-      setBioReady(false); // biometria precisa ser reconfigurada neste aparelho
-      setPhase('locked');
-      showToast('Cofre encontrado — digite a senha-mestra');
+      const token = await getAccessToken(true, undefined, 'restore');
+      await finishRestore(token);
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
       showToast('Não foi possível conectar ao Google');
     }
-  }, [showToast]);
+  }, [finishRestore, showToast]);
+
+  // Retomada do fluxo de redirect: em PWAs instaladas (Android) o popup do
+  // Google é bloqueado pelo navegador, então caímos para um redirect de
+  // página inteira — a volta acontece num reload, e é aqui que ela conclui.
+  useEffect(() => {
+    const result = consumeRedirectAuth();
+    if (!result) return;
+    if (result.status === 'error') {
+      setGoogle((g) => ({ ...g, status: 'error', error: result.message }));
+      showToast('Não foi possível conectar ao Google');
+      return;
+    }
+    setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
+    if (result.intent === 'connect') void finishConnect(result.token);
+    else void finishRestore(result.token);
+  }, [finishConnect, finishRestore, showToast]);
 
   const value = useMemo<AppState>(
     () => ({
