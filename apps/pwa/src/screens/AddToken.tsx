@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import jsQR from 'jsqr';
 import { Avatar, IconChevronLeft, IconQrPlus } from '@aegis/ui';
 import { avatarFor, parseOtpAuth } from '@aegis/core';
 import { useApp } from '../store';
 
-type BarcodeDetectorLike = {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
-};
-
-declare global {
-  interface Window {
-    BarcodeDetector?: new (options?: { formats: string[] }) => BarcodeDetectorLike;
-  }
-}
-
 /**
- * Adição de token 2FA: leitor de QR Code via câmera (BarcodeDetector,
- * quando o dispositivo suporta) com entrada manual como alternativa.
- * Também lista os tokens existentes para remoção.
+ * Adição de token 2FA: leitor de QR Code via câmera com entrada manual como
+ * alternativa. Também lista os tokens existentes para remoção.
+ *
+ * A decodificação usa jsQR (puro JS, lê um <canvas> com o frame do vídeo)
+ * em vez do BarcodeDetector nativo do navegador: esse último só existe no
+ * Chrome Android/ChromeOS por padrão — no Chrome desktop (Windows/Mac/
+ * Linux), Firefox e Safari ele não está disponível, então o scanner nunca
+ * funcionava fora do celular.
  */
 export function AddToken() {
   const { vault, closeAddToken, addToken, deleteToken } = useApp();
@@ -26,6 +22,7 @@ export function AddToken() {
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'unavailable'>('idle');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const stopCamera = () => {
@@ -37,44 +34,90 @@ export function AddToken() {
   useEffect(() => stopCamera, []);
 
   const startScan = async () => {
-    if (!window.BarcodeDetector || !navigator.mediaDevices?.getUserMedia) {
+    // navigator.mediaDevices só existe em contexto seguro (HTTPS ou
+    // localhost) — acessar o app por HTTP num IP local (ex.: testando pelo
+    // celular na mesma rede) faz isso vir undefined, e o leitor nem chega a
+    // pedir a câmera.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      console.error('[Aegis] getUserMedia indisponível — isSecureContext:', window.isSecureContext);
       setScanState('unavailable');
       return;
     }
     try {
+      // No celular prefere a câmera traseira; no desktop não existe essa
+      // distinção e o navegador ignora a preferência, caindo na webcam.
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
       streamRef.current = stream;
       setScanState('scanning');
-      const video = videoRef.current;
-      if (!video) return;
-      video.srcObject = stream;
-      await video.play();
-      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-      const tick = async () => {
-        if (!streamRef.current) return;
-        try {
-          const codes = await detector.detect(video);
-          const parsed = codes[0] && parseOtpAuth(codes[0].rawValue);
-          if (parsed) {
-            setIssuer(parsed.issuer);
-            setAccount(parsed.account);
-            setSecretInput(parsed.secret);
-            stopCamera();
-            return;
-          }
-        } catch {
-          // frame não decodificável — continua tentando
-        }
-        setTimeout(tick, 350);
-      };
-      tick();
-    } catch {
+    } catch (err) {
+      console.error('[Aegis] getUserMedia falhou:', err);
       stopCamera();
       setScanState('unavailable');
     }
   };
+
+  // Liga o stream ao <video> só depois que `scanState` vira 'scanning' e o
+  // React já montou o elemento — ligar antes (ainda no clique) pega
+  // `videoRef.current` nulo, porque o <video> só existe no DOM condicional
+  // quando scanState === 'scanning', e o re-render ainda não aconteceu. Sem
+  // isso o srcObject nunca é atribuído e a tela da câmera fica preta.
+  useEffect(() => {
+    if (scanState !== 'scanning') return;
+    const stream = streamRef.current;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!stream || !video || !canvas) return;
+
+    let cancelled = false;
+    let frameId = 0;
+    video.srcObject = stream;
+    video
+      .play()
+      .then(() => {
+        if (cancelled) return;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+        const tick = () => {
+          if (cancelled || !streamRef.current) return;
+          if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(frame.data, frame.width, frame.height);
+            if (code) {
+              const parsed = parseOtpAuth(code.data);
+              if (parsed) {
+                setIssuer(parsed.issuer);
+                setAccount(parsed.account);
+                setSecretInput(parsed.secret);
+                setError('');
+                stopCamera();
+                return;
+              }
+              // Lê o QR mas não é um código 2FA (otpauth://) — avisa e
+              // continua escaneando, em vez de falhar em silêncio.
+              setError('QR Code lido, mas não é um código 2FA válido');
+            }
+          }
+          frameId = requestAnimationFrame(tick);
+        };
+        frameId = requestAnimationFrame(tick);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          stopCamera();
+          setScanState('unavailable');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [scanState]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -110,6 +153,7 @@ export function AddToken() {
         {scanState === 'scanning' ? (
           <div className="qr-video-wrap">
             <video ref={videoRef} className="qr-video" muted playsInline />
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
             <button type="button" className="action-btn" onClick={stopCamera} style={{ marginTop: 10 }}>
               Parar câmera
             </button>

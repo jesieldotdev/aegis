@@ -18,6 +18,7 @@ import {
   encryptWithKey,
   exportVault,
   generatePassword,
+  getLastBiometricError,
   importVault,
   isWebAuthnAvailable,
   noteKey,
@@ -49,11 +50,13 @@ import {
 } from './storage';
 import {
   clearToken,
+  describeAuthError,
   downloadVault,
   fetchAccount,
   getAccessToken,
   getCachedToken,
   isGoogleConfigured,
+  preloadGis,
 } from './google';
 import { syncWithDrive } from './sync';
 
@@ -68,6 +71,9 @@ export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
 
 export type GoogleState = {
   configured: boolean;
+  /** Script do GIS já carregado — só então é seguro habilitar o botão de
+   *  login (clicar antes disso reabre o bug do popup fechando sozinho). */
+  ready: boolean;
   account: RememberedGoogle | null;
   status: SyncStatus;
   lastSync: number | null;
@@ -166,6 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState('');
   const [google, setGoogle] = useState<GoogleState>({
     configured: isGoogleConfigured(),
+    ready: false,
     account: null,
     status: 'idle',
     lastSync: null,
@@ -187,6 +194,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBioReady(stored.bio && hasWrappedVaultKey() && isWebAuthnAvailable());
     setGoogle((g) => ({ ...g, account: loadGoogle() }));
     setPhase(envelope ? 'locked' : 'onboarding');
+  }, []);
+
+  // Carrega o script do Google Identity Services de antemão: se ele só
+  // começar a carregar no clique do botão "Entrar com Google", o popup de
+  // autorização abre fora do gesto do usuário e é fechado na hora. Os
+  // botões ficam desabilitados (google.ready) até isso terminar.
+  useEffect(() => {
+    if (!isGoogleConfigured()) return;
+    preloadGis()
+      .then(() => setGoogle((g) => ({ ...g, ready: true })))
+      .catch(() => {});
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -549,7 +567,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const registered = await registerBiometric(vault.profile.name);
       if (!registered) {
+        const detail = getLastBiometricError();
         showToast('Não foi possível registrar a biometria');
+        // Toast some sozinho rápido demais pra copiar um erro técnico, e
+        // nem todo celular tem acesso fácil ao console remoto — um alert
+        // garante que dá pra ler (e reportar) a mensagem completa.
+        if (detail) window.alert(`Biometria falhou:\n${detail}`);
         return;
       }
       await storeWrappedVaultKey(keyRef.current);
@@ -648,7 +671,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showToast(`Conectado como ${account.email}`);
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
-      showToast('Não foi possível conectar ao Google');
+      showToast(describeAuthError(err));
     }
   }, [runSync, showToast]);
 
@@ -691,7 +714,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showToast('Cofre encontrado — digite a senha-mestra');
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
-      showToast('Não foi possível conectar ao Google');
+      showToast(describeAuthError(err));
     }
   }, [showToast]);
 
