@@ -205,6 +205,22 @@ export function Settings() {
           </div>
         </div>
 
+        <div>
+          <div className="set-section-title">Navegador</div>
+          <div className="set-group">
+            <div className="set-row set-row--click" onClick={() => window.open('/extension', '_blank', 'noopener')}>
+              <div className="set-row-icon" style={{ background: 'rgba(139,92,246,.16)', color: 'var(--accent)' }}>
+                <IconDownload size={18} />
+              </div>
+              <div className="set-row-body">
+                <div className="set-row-title">Extensão para Chrome</div>
+                <div className="set-row-sub">Baixar e instalar o Aegis no navegador</div>
+              </div>
+              <IconChevronRight size={17} style={{ color: '#54546a' }} />
+            </div>
+          </div>
+        </div>
+
         <button type="button" className="set-lock-btn" onClick={lock}>
           <IconPadlock size={18} />
           Bloquear cofre
