@@ -18,6 +18,7 @@ import {
   encryptWithKey,
   exportVault,
   generatePassword,
+  getLastBiometricError,
   importVault,
   isWebAuthnAvailable,
   noteKey,
@@ -566,7 +567,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const registered = await registerBiometric(vault.profile.name);
       if (!registered) {
+        const detail = getLastBiometricError();
         showToast('Não foi possível registrar a biometria');
+        // Toast some sozinho rápido demais pra copiar um erro técnico, e
+        // nem todo celular tem acesso fácil ao console remoto — um alert
+        // garante que dá pra ler (e reportar) a mensagem completa.
+        if (detail) window.alert(`Biometria falhou:\n${detail}`);
         return;
       }
       await storeWrappedVaultKey(keyRef.current);

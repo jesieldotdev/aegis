@@ -34,7 +34,12 @@ export function AddToken() {
   useEffect(() => stopCamera, []);
 
   const startScan = async () => {
+    // navigator.mediaDevices só existe em contexto seguro (HTTPS ou
+    // localhost) — acessar o app por HTTP num IP local (ex.: testando pelo
+    // celular na mesma rede) faz isso vir undefined, e o leitor nem chega a
+    // pedir a câmera.
     if (!navigator.mediaDevices?.getUserMedia) {
+      console.error('[Aegis] getUserMedia indisponível — isSecureContext:', window.isSecureContext);
       setScanState('unavailable');
       return;
     }
@@ -46,7 +51,8 @@ export function AddToken() {
       });
       streamRef.current = stream;
       setScanState('scanning');
-    } catch {
+    } catch (err) {
+      console.error('[Aegis] getUserMedia falhou:', err);
       stopCamera();
       setScanState('unavailable');
     }
@@ -81,13 +87,19 @@ export function AddToken() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(frame.data, frame.width, frame.height);
-            const parsed = code && parseOtpAuth(code.data);
-            if (parsed) {
-              setIssuer(parsed.issuer);
-              setAccount(parsed.account);
-              setSecretInput(parsed.secret);
-              stopCamera();
-              return;
+            if (code) {
+              const parsed = parseOtpAuth(code.data);
+              if (parsed) {
+                setIssuer(parsed.issuer);
+                setAccount(parsed.account);
+                setSecretInput(parsed.secret);
+                setError('');
+                stopCamera();
+                return;
+              }
+              // Lê o QR mas não é um código 2FA (otpauth://) — avisa e
+              // continua escaneando, em vez de falhar em silêncio.
+              setError('QR Code lido, mas não é um código 2FA válido');
             }
           }
           frameId = requestAnimationFrame(tick);
