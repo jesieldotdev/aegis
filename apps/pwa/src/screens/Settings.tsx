@@ -108,14 +108,22 @@ export function Settings() {
                 </div>
               </>
             ) : (
-              <div className="set-row set-row--click" onClick={() => void connectGoogle()}>
+              <div
+                className="set-row set-row--click"
+                onClick={google.ready ? () => void connectGoogle() : undefined}
+                style={google.ready ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+              >
                 <div className="set-row-icon" style={{ background: 'rgba(66,133,244,.16)' }}>
                   <IconGoogle size={18} />
                 </div>
                 <div className="set-row-body">
                   <div className="set-row-title">Conectar com Google</div>
                   <div className="set-row-sub">
-                    {google.configured ? 'Cofre cifrado no seu Google Drive' : 'Requer VITE_GOOGLE_CLIENT_ID'}
+                    {!google.configured
+                      ? 'Requer VITE_GOOGLE_CLIENT_ID'
+                      : google.ready
+                        ? 'Cofre cifrado no seu Google Drive'
+                        : 'Preparando…'}
                   </div>
                 </div>
                 <IconChevronRight size={17} style={{ color: '#54546a' }} />
@@ -193,6 +201,22 @@ export function Settings() {
                 style={{ display: 'none' }}
                 onChange={(e) => void onImportFile(e.target.files?.[0])}
               />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div className="set-section-title">Navegador</div>
+          <div className="set-group">
+            <div className="set-row set-row--click" onClick={() => window.open('/extension', '_blank', 'noopener')}>
+              <div className="set-row-icon" style={{ background: 'rgba(139,92,246,.16)', color: 'var(--accent)' }}>
+                <IconDownload size={18} />
+              </div>
+              <div className="set-row-body">
+                <div className="set-row-title">Extensão para Chrome</div>
+                <div className="set-row-sub">Baixar e instalar o Aegis no navegador</div>
+              </div>
+              <IconChevronRight size={17} style={{ color: '#54546a' }} />
             </div>
           </div>
         </div>
