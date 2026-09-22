@@ -47,34 +47,61 @@ export function AddToken() {
       });
       streamRef.current = stream;
       setScanState('scanning');
-      const video = videoRef.current;
-      if (!video) return;
-      video.srcObject = stream;
-      await video.play();
-      const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
-      const tick = async () => {
-        if (!streamRef.current) return;
-        try {
-          const codes = await detector.detect(video);
-          const parsed = codes[0] && parseOtpAuth(codes[0].rawValue);
-          if (parsed) {
-            setIssuer(parsed.issuer);
-            setAccount(parsed.account);
-            setSecretInput(parsed.secret);
-            stopCamera();
-            return;
-          }
-        } catch {
-          // frame não decodificável — continua tentando
-        }
-        setTimeout(tick, 350);
-      };
-      tick();
     } catch {
       stopCamera();
       setScanState('unavailable');
     }
   };
+
+  // Liga o stream ao <video> só depois que `scanState` vira 'scanning' e o
+  // React já montou o elemento — ligar antes (ainda no clique) pega
+  // `videoRef.current` nulo, porque o <video> só existe no DOM condicional
+  // quando scanState === 'scanning', e o re-render ainda não aconteceu. Sem
+  // isso o srcObject nunca é atribuído e a tela da câmera fica preta.
+  useEffect(() => {
+    if (scanState !== 'scanning') return;
+    const stream = streamRef.current;
+    const video = videoRef.current;
+    const detectorCtor = window.BarcodeDetector;
+    if (!stream || !video || !detectorCtor) return;
+
+    let cancelled = false;
+    video.srcObject = stream;
+    video
+      .play()
+      .then(() => {
+        if (cancelled) return;
+        const detector = new detectorCtor({ formats: ['qr_code'] });
+        const tick = async () => {
+          if (cancelled || !streamRef.current) return;
+          try {
+            const codes = await detector.detect(video);
+            const parsed = codes[0] && parseOtpAuth(codes[0].rawValue);
+            if (parsed) {
+              setIssuer(parsed.issuer);
+              setAccount(parsed.account);
+              setSecretInput(parsed.secret);
+              stopCamera();
+              return;
+            }
+          } catch {
+            // frame não decodificável — continua tentando
+          }
+          if (!cancelled) setTimeout(tick, 350);
+        };
+        tick();
+      })
+      .catch(() => {
+        if (!cancelled) {
+          stopCamera();
+          setScanState('unavailable');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scanState]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
