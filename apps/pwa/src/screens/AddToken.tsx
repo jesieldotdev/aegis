@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import jsQR from 'jsqr';
 import { Avatar, IconChevronLeft, IconQrPlus } from '@aegis/ui';
 import { avatarFor, parseOtpAuth } from '@aegis/core';
 import { useApp } from '../store';
 
-type BarcodeDetectorLike = {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
-};
-
-declare global {
-  interface Window {
-    BarcodeDetector?: new (options?: { formats: string[] }) => BarcodeDetectorLike;
-  }
-}
-
 /**
- * Adição de token 2FA: leitor de QR Code via câmera (BarcodeDetector,
- * quando o dispositivo suporta) com entrada manual como alternativa.
- * Também lista os tokens existentes para remoção.
+ * Adição de token 2FA: leitor de QR Code via câmera com entrada manual como
+ * alternativa. Também lista os tokens existentes para remoção.
+ *
+ * A decodificação usa jsQR (puro JS, lê um <canvas> com o frame do vídeo)
+ * em vez do BarcodeDetector nativo do navegador: esse último só existe no
+ * Chrome Android/ChromeOS por padrão — no Chrome desktop (Windows/Mac/
+ * Linux), Firefox e Safari ele não está disponível, então o scanner nunca
+ * funcionava fora do celular.
  */
 export function AddToken() {
   const { vault, closeAddToken, addToken, deleteToken } = useApp();
@@ -26,6 +22,7 @@ export function AddToken() {
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'unavailable'>('idle');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const stopCamera = () => {
@@ -37,11 +34,13 @@ export function AddToken() {
   useEffect(() => stopCamera, []);
 
   const startScan = async () => {
-    if (!window.BarcodeDetector || !navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia) {
       setScanState('unavailable');
       return;
     }
     try {
+      // No celular prefere a câmera traseira; no desktop não existe essa
+      // distinção e o navegador ignora a preferência, caindo na webcam.
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
@@ -62,21 +61,27 @@ export function AddToken() {
     if (scanState !== 'scanning') return;
     const stream = streamRef.current;
     const video = videoRef.current;
-    const detectorCtor = window.BarcodeDetector;
-    if (!stream || !video || !detectorCtor) return;
+    const canvas = canvasRef.current;
+    if (!stream || !video || !canvas) return;
 
     let cancelled = false;
+    let frameId = 0;
     video.srcObject = stream;
     video
       .play()
       .then(() => {
         if (cancelled) return;
-        const detector = new detectorCtor({ formats: ['qr_code'] });
-        const tick = async () => {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+        const tick = () => {
           if (cancelled || !streamRef.current) return;
-          try {
-            const codes = await detector.detect(video);
-            const parsed = codes[0] && parseOtpAuth(codes[0].rawValue);
+          if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(frame.data, frame.width, frame.height);
+            const parsed = code && parseOtpAuth(code.data);
             if (parsed) {
               setIssuer(parsed.issuer);
               setAccount(parsed.account);
@@ -84,12 +89,10 @@ export function AddToken() {
               stopCamera();
               return;
             }
-          } catch {
-            // frame não decodificável — continua tentando
           }
-          if (!cancelled) setTimeout(tick, 350);
+          frameId = requestAnimationFrame(tick);
         };
-        tick();
+        frameId = requestAnimationFrame(tick);
       })
       .catch(() => {
         if (!cancelled) {
@@ -100,6 +103,7 @@ export function AddToken() {
 
     return () => {
       cancelled = true;
+      cancelAnimationFrame(frameId);
     };
   }, [scanState]);
 
@@ -137,6 +141,7 @@ export function AddToken() {
         {scanState === 'scanning' ? (
           <div className="qr-video-wrap">
             <video ref={videoRef} className="qr-video" muted playsInline />
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
             <button type="button" className="action-btn" onClick={stopCamera} style={{ marginTop: 10 }}>
               Parar câmera
             </button>
