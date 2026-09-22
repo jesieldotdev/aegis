@@ -12,6 +12,21 @@
 
 const CREDENTIAL_ID_KEY = 'aegis.webauthn.credentialId';
 
+// Guarda o último erro do WebAuthn pra exibir na UI — em celular sem acesso
+// fácil ao console remoto, isso é o único jeito prático de saber por que
+// "registrar biometria" falhou (o navegador não mostra nada sozinho).
+let lastError: string | null = null;
+
+export function getLastBiometricError(): string | null {
+  return lastError;
+}
+
+function describeWebAuthnError(err: unknown): string {
+  if (err instanceof DOMException) return `${err.name}: ${err.message}`;
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 export function isWebAuthnAvailable(): boolean {
   // isSecureContext é essencial: fora de HTTPS (ou localhost), o Chrome
   // ainda expõe window.PublicKeyCredential, mas navigator.credentials.create
@@ -79,8 +94,10 @@ export async function registerBiometric(userName: string): Promise<boolean> {
     })) as PublicKeyCredential | null;
     if (!credential) return false;
     localStorage.setItem(CREDENTIAL_ID_KEY, toBase64Url(credential.rawId));
+    lastError = null;
     return true;
   } catch (err) {
+    lastError = describeWebAuthnError(err);
     console.error('[Aegis] registerBiometric falhou:', err);
     return false;
   }
@@ -103,8 +120,10 @@ export async function verifyBiometric(userName: string): Promise<boolean> {
         timeout: 60_000,
       },
     });
+    lastError = null;
     return !!assertion;
   } catch (err) {
+    lastError = describeWebAuthnError(err);
     console.error('[Aegis] verifyBiometric falhou:', err);
     return false;
   }
