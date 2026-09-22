@@ -106,7 +106,7 @@ export function Onboarding() {
           <button
             type="button"
             className="ob-restore"
-            disabled={restoring || creating}
+            disabled={restoring || creating || !google.ready}
             onClick={async () => {
               setRestoring(true);
               try {
@@ -117,7 +117,11 @@ export function Onboarding() {
             }}
           >
             <IconGoogle size={17} />
-            {restoring ? 'Buscando cofre…' : 'Já tenho um cofre — entrar com Google'}
+            {restoring
+              ? 'Buscando cofre…'
+              : google.ready
+                ? 'Já tenho um cofre — entrar com Google'
+                : 'Preparando login com Google…'}
           </button>
         </>
       )}
