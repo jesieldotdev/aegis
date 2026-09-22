@@ -69,6 +69,9 @@ export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
 
 export type GoogleState = {
   configured: boolean;
+  /** Script do GIS já carregado — só então é seguro habilitar o botão de
+   *  login (clicar antes disso reabre o bug do popup fechando sozinho). */
+  ready: boolean;
   account: RememberedGoogle | null;
   status: SyncStatus;
   lastSync: number | null;
@@ -167,6 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState('');
   const [google, setGoogle] = useState<GoogleState>({
     configured: isGoogleConfigured(),
+    ready: false,
     account: null,
     status: 'idle',
     lastSync: null,
@@ -192,9 +196,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Carrega o script do Google Identity Services de antemão: se ele só
   // começar a carregar no clique do botão "Entrar com Google", o popup de
-  // autorização abre fora do gesto do usuário e é fechado na hora.
+  // autorização abre fora do gesto do usuário e é fechado na hora. Os
+  // botões ficam desabilitados (google.ready) até isso terminar.
   useEffect(() => {
-    if (isGoogleConfigured()) preloadGis().catch(() => {});
+    if (!isGoogleConfigured()) return;
+    preloadGis()
+      .then(() => setGoogle((g) => ({ ...g, ready: true })))
+      .catch(() => {});
   }, []);
 
   const showToast = useCallback((msg: string) => {

@@ -48,6 +48,9 @@ declare global {
 }
 
 let gisPromise: Promise<Gsi> | null = null;
+// Cache síncrono do GIS já carregado. Existe só pra `getAccessToken` poder
+// pular o `await` por completo quando o script já está pronto — ver abaixo.
+let loadedGis: Gsi | null = null;
 
 /**
  * Carrega o script do GIS antecipadamente (ex.: ao montar a tela), sem
@@ -60,17 +63,26 @@ export function preloadGis(): Promise<Gsi> {
   return loadGis();
 }
 
+/** Se o GIS já carregou, o botão de login pode ser habilitado com segurança. */
+export function isGisReady(): boolean {
+  return loadedGis !== null;
+}
+
 function loadGis(): Promise<Gsi> {
   gisPromise ??= new Promise<Gsi>((resolve, reject) => {
-    if (window.google?.accounts?.oauth2) return resolve(window.google);
+    if (window.google?.accounts?.oauth2) {
+      loadedGis = window.google;
+      return resolve(window.google);
+    }
     const script = document.createElement('script');
     script.src = GIS_SRC;
     script.async = true;
     script.defer = true;
-    script.onload = () =>
-      window.google?.accounts?.oauth2
-        ? resolve(window.google)
-        : reject(new Error('GIS indisponível'));
+    script.onload = () => {
+      if (!window.google?.accounts?.oauth2) return reject(new Error('GIS indisponível'));
+      loadedGis = window.google;
+      resolve(window.google);
+    };
     script.onerror = () => reject(new Error('Falha ao carregar o Google Identity Services'));
     document.head.appendChild(script);
   });
@@ -83,12 +95,22 @@ let cachedToken: { value: string; expiresAt: number } | null = null;
  * Obtém um access token. `interactive` mostra o consentimento (primeira
  * conexão); depois tenta silenciosamente (`prompt: ''`). Passe `hint` (e-mail
  * da conta já conectada) para o GIS renovar sem exibir o seletor de conta.
+ *
+ * Importante: quando chamado a partir de um clique, isso PRECISA acabar
+ * chamando `requestAccessToken()` sem nenhum `await` no meio — um único
+ * "tick" de microtask entre o gesto do usuário e a abertura do popup já é
+ * suficiente pro Chrome Android decidir que não foi gesto do usuário e
+ * bloquear (é exatamente o "Failed to open popup window... Maybe blocked
+ * by the browser" do GIS). Por isso o `??` abaixo: se o GIS já carregou
+ * (`preloadGis` already resolvido), usamos o valor em cache direto, sem
+ * `await` — só cai no `await loadGis()` se o script ainda não tiver
+ * carregado, caso em que o popup já ia falhar de qualquer forma.
  */
 export async function getAccessToken(interactive: boolean, hint?: string): Promise<string> {
   if (!isGoogleConfigured()) throw new Error('Google Client ID não configurado');
   if (cachedToken && cachedToken.expiresAt - 60_000 > Date.now()) return cachedToken.value;
 
-  const gis = await loadGis();
+  const gis = loadedGis ?? (await loadGis());
   return new Promise<string>((resolve, reject) => {
     const client = gis.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID!,

@@ -108,14 +108,22 @@ export function Settings() {
                 </div>
               </>
             ) : (
-              <div className="set-row set-row--click" onClick={() => void connectGoogle()}>
+              <div
+                className="set-row set-row--click"
+                onClick={google.ready ? () => void connectGoogle() : undefined}
+                style={google.ready ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+              >
                 <div className="set-row-icon" style={{ background: 'rgba(66,133,244,.16)' }}>
                   <IconGoogle size={18} />
                 </div>
                 <div className="set-row-body">
                   <div className="set-row-title">Conectar com Google</div>
                   <div className="set-row-sub">
-                    {google.configured ? 'Cofre cifrado no seu Google Drive' : 'Requer VITE_GOOGLE_CLIENT_ID'}
+                    {!google.configured
+                      ? 'Requer VITE_GOOGLE_CLIENT_ID'
+                      : google.ready
+                        ? 'Cofre cifrado no seu Google Drive'
+                        : 'Preparando…'}
                   </div>
                 </div>
                 <IconChevronRight size={17} style={{ color: '#54546a' }} />
