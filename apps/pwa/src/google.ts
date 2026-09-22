@@ -136,6 +136,25 @@ export function getCachedToken(): string | null {
   return cachedToken && cachedToken.expiresAt - 60_000 > Date.now() ? cachedToken.value : null;
 }
 
+/**
+ * Traduz o `type` que o GIS manda no `error_callback` (virou a mensagem do
+ * Error lançado acima) numa explicação que a pessoa consiga agir. Isso não
+ * é timing — se cair aqui com `popup_failed_to_open` mesmo com o GIS já
+ * carregado e o clique síncrono, é o Chrome bloqueando popups deste site
+ * por configuração (não tem contorno no código: é ajuste no navegador).
+ */
+export function describeAuthError(err: unknown): string {
+  const type = err instanceof Error ? err.message : '';
+  switch (type) {
+    case 'popup_failed_to_open':
+      return 'Chrome bloqueou o popup — libere pop-ups pro site e tente de novo';
+    case 'popup_closed':
+      return 'Login cancelado — a janela do Google foi fechada antes de terminar.';
+    default:
+      return 'Não foi possível conectar ao Google';
+  }
+}
+
 export function clearToken(): void {
   const token = cachedToken?.value;
   cachedToken = null;

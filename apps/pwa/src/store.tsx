@@ -49,6 +49,7 @@ import {
 } from './storage';
 import {
   clearToken,
+  describeAuthError,
   downloadVault,
   fetchAccount,
   getAccessToken,
@@ -664,7 +665,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showToast(`Conectado como ${account.email}`);
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
-      showToast('Não foi possível conectar ao Google');
+      showToast(describeAuthError(err));
     }
   }, [runSync, showToast]);
 
@@ -707,7 +708,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showToast('Cofre encontrado — digite a senha-mestra');
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
-      showToast('Não foi possível conectar ao Google');
+      showToast(describeAuthError(err));
     }
   }, [showToast]);
 
