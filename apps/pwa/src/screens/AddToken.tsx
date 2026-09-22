@@ -81,13 +81,19 @@ export function AddToken() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(frame.data, frame.width, frame.height);
-            const parsed = code && parseOtpAuth(code.data);
-            if (parsed) {
-              setIssuer(parsed.issuer);
-              setAccount(parsed.account);
-              setSecretInput(parsed.secret);
-              stopCamera();
-              return;
+            if (code) {
+              const parsed = parseOtpAuth(code.data);
+              if (parsed) {
+                setIssuer(parsed.issuer);
+                setAccount(parsed.account);
+                setSecretInput(parsed.secret);
+                setError('');
+                stopCamera();
+                return;
+              }
+              // Lê o QR mas não é um código 2FA (otpauth://) — avisa e
+              // continua escaneando, em vez de falhar em silêncio.
+              setError('QR Code lido, mas não é um código 2FA válido');
             }
           }
           frameId = requestAnimationFrame(tick);
