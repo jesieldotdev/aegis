@@ -34,7 +34,12 @@ export function AddToken() {
   useEffect(() => stopCamera, []);
 
   const startScan = async () => {
+    // navigator.mediaDevices só existe em contexto seguro (HTTPS ou
+    // localhost) — acessar o app por HTTP num IP local (ex.: testando pelo
+    // celular na mesma rede) faz isso vir undefined, e o leitor nem chega a
+    // pedir a câmera.
     if (!navigator.mediaDevices?.getUserMedia) {
+      console.error('[Aegis] getUserMedia indisponível — isSecureContext:', window.isSecureContext);
       setScanState('unavailable');
       return;
     }
@@ -46,7 +51,8 @@ export function AddToken() {
       });
       streamRef.current = stream;
       setScanState('scanning');
-    } catch {
+    } catch (err) {
+      console.error('[Aegis] getUserMedia falhou:', err);
       stopCamera();
       setScanState('unavailable');
     }
