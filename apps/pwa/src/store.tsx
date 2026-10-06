@@ -96,6 +96,8 @@ type AppState = {
   /** Nota em edição: undefined = fechada, null = nova nota. */
   editingNoteId: string | null | undefined;
   addingToken: boolean;
+  /** Token 2FA em edição (null = nenhum). */
+  editingTokenId: string | null;
   folder: Folder;
   search: string;
   revealed: boolean;
@@ -116,6 +118,8 @@ type AppState = {
   closeEdit: () => void;
   openAddToken: () => void;
   closeAddToken: () => void;
+  openEditToken: (id: string) => void;
+  closeEditToken: () => void;
   setFolder: (folder: Folder) => void;
   setSearch: (search: string) => void;
   toggleReveal: () => void;
@@ -123,6 +127,7 @@ type AppState = {
   saveCredential: (cred: Credential) => void;
   deleteCredential: (id: string) => void;
   addToken: (token: Omit<TotpToken, 'id' | 'updatedAt'>) => void;
+  updateToken: (token: TotpToken) => void;
   deleteToken: (id: string) => void;
 
   openNote: (id: string | null) => void;
@@ -164,6 +169,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [editingId, setEditingId] = useState<string | null | undefined>(undefined);
   const [editingNoteId, setEditingNoteId] = useState<string | null | undefined>(undefined);
   const [addingToken, setAddingToken] = useState(false);
+  const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
   const [folder, setFolder] = useState<Folder>('Todos');
   const [search, setSearch] = useState('');
   const [revealed, setRevealed] = useState(false);
@@ -398,6 +404,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEditingId(undefined);
     setEditingNoteId(undefined);
     setAddingToken(false);
+    setEditingTokenId(null);
     setRevealed(false);
     setBioReady(loadSettings().bio && hasWrappedVaultKey() && isWebAuthnAvailable());
   }, []);
@@ -438,6 +445,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const closeNote = useCallback(() => setEditingNoteId(undefined), []);
   const openAddToken = useCallback(() => setAddingToken(true), []);
   const closeAddToken = useCallback(() => setAddingToken(false), []);
+  const openEditToken = useCallback((id: string) => setEditingTokenId(id), []);
+  const closeEditToken = useCallback(() => setEditingTokenId(null), []);
   const toggleReveal = useCallback(() => setRevealed((r) => !r), []);
 
   // ---------- CRUD ----------
@@ -489,6 +498,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [mutateVault, showToast],
   );
 
+  const updateToken = useCallback(
+    (token: TotpToken) => {
+      const now = Date.now();
+      mutateVault((v) => ({
+        ...v,
+        tokens: v.tokens.map((t) => (t.id === token.id ? { ...token, updatedAt: now } : t)),
+        updatedAt: now,
+      }));
+      setEditingTokenId(null);
+      showToast('Token salvo');
+    },
+    [mutateVault, showToast],
+  );
+
   const deleteToken = useCallback(
     (id: string) => {
       const now = Date.now();
@@ -498,6 +521,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tombstones: { ...v.tombstones, [tokenKey(id)]: now },
         updatedAt: now,
       }));
+      setEditingTokenId(null);
       showToast('Token removido');
     },
     [mutateVault, showToast],
@@ -721,13 +745,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppState>(
     () => ({
       phase, vault, settings, google, bioReady, scanning, unlockError,
-      tab, detailId, editingId, editingNoteId, addingToken, folder, search, revealed,
+      tab, detailId, editingId, editingNoteId, addingToken, editingTokenId, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
       clearUnlockError: () => setUnlockError(''),
-      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
+      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken, openEditToken, closeEditToken,
       setFolder, setSearch, toggleReveal,
-      saveCredential, deleteCredential, addToken, deleteToken,
+      saveCredential, deleteCredential, addToken, updateToken, deleteToken,
       openNote, closeNote, saveNote, deleteNote,
       setGenOpts, regen,
       setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
@@ -735,11 +759,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       phase, vault, settings, google, bioReady, scanning, unlockError,
-      tab, detailId, editingId, editingNoteId, addingToken, folder, search, revealed,
+      tab, detailId, editingId, editingNoteId, addingToken, editingTokenId, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
-      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
-      toggleReveal, saveCredential, deleteCredential, addToken, deleteToken,
+      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken, openEditToken, closeEditToken,
+      toggleReveal, saveCredential, deleteCredential, addToken, updateToken, deleteToken,
       openNote, closeNote, saveNote, deleteNote,
       setGenOpts, regen, setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
       connectGoogle, disconnectGoogle, syncNow, restoreFromGoogle,

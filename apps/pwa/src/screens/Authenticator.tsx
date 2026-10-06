@@ -1,22 +1,32 @@
 import type { CSSProperties } from 'react';
-import { Avatar, CountdownRing, IconQrPlus, ringColor } from '@aegis/ui';
+import { Avatar, CountdownRing, IconEdit, IconQrPlus, ringColor } from '@aegis/ui';
 import { avatarFor, totpCounter, type TotpToken } from '@aegis/core';
 import { useApp } from '../store';
 import { useNow, useTotp } from '../hooks';
 
 function TokenCard({ token, now, index }: { token: TotpToken; now: number; index: number }) {
-  const { copy } = useApp();
+  const { copy, openEditToken } = useApp();
   const totp = useTotp(token.secret, now);
   const avatar = avatarFor(token.id, token.issuer);
   const color = ringColor(totp.remaining);
   const expiring = totp.remaining <= 5;
+  const copyCode = () => copy('Código', totp.code.replace(' ', ''));
 
   return (
-    <button
-      type="button"
+    // div (e não <button>) porque o card contém o botão de editar — botão
+    // dentro de botão é HTML inválido.
+    <div
+      role="button"
+      tabIndex={0}
       className="token-card"
       style={{ '--i': index } as CSSProperties}
-      onClick={() => copy('Código', totp.code.replace(' ', ''))}
+      onClick={() => copyCode()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          copyCode();
+        }
+      }}
     >
       <Avatar color={avatar.color} initial={avatar.initial} size={44} fontSize={18} shadow={false} />
       <div className="token-body">
@@ -32,7 +42,18 @@ function TokenCard({ token, now, index }: { token: TotpToken; now: number; index
         fontSize={14}
         periodKey={totpCounter(now)}
       />
-    </button>
+      <button
+        type="button"
+        className="token-edit"
+        aria-label={`Editar ${token.issuer}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          openEditToken(token.id);
+        }}
+      >
+        <IconEdit size={16} />
+      </button>
+    </div>
   );
 }
 

@@ -5,6 +5,7 @@ import { Vault } from './screens/Vault';
 import { Detail } from './screens/Detail';
 import { EditItem } from './screens/EditItem';
 import { AddToken } from './screens/AddToken';
+import { EditToken } from './screens/EditToken';
 import { Authenticator } from './screens/Authenticator';
 import { Notes } from './screens/Notes';
 import { NoteEdit } from './screens/NoteEdit';
@@ -14,7 +15,7 @@ import { TabBar } from './components/TabBar';
 import { Toast } from './components/Toast';
 
 export function App() {
-  const { phase, tab, detailId, editingId, editingNoteId, addingToken } = useApp();
+  const { phase, tab, detailId, editingId, editingNoteId, addingToken, editingTokenId } = useApp();
 
   return (
     <div className="app">
@@ -27,6 +28,8 @@ export function App() {
             <EditItem />
           ) : editingNoteId !== undefined ? (
             <NoteEdit />
+          ) : editingTokenId ? (
+            <EditToken key={editingTokenId} />
           ) : addingToken ? (
             <AddToken />
           ) : detailId ? (
