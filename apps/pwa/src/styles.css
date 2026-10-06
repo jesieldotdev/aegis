@@ -1450,6 +1450,53 @@ button {
   flex: 0 0 auto;
 }
 
+.tk-edit {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  flex: 0 0 auto;
+  margin-right: 6px;
+}
+
+.token-edit {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  margin-right: -4px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.token-edit:hover,
+.token-edit:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.mp-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--accent-tint);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
 /* ===== Feedback de toque ===== */
 .icon-btn,
 .mini-btn,

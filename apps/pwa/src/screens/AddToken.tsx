@@ -15,7 +15,7 @@ import { useApp } from '../store';
  * funcionava fora do celular.
  */
 export function AddToken() {
-  const { vault, closeAddToken, addToken, deleteToken } = useApp();
+  const { vault, closeAddToken, addToken, deleteToken, openEditToken } = useApp();
   const [issuer, setIssuer] = useState('');
   const [account, setAccount] = useState('');
   const [secretInput, setSecretInput] = useState('');
@@ -206,6 +206,9 @@ export function AddToken() {
                       <div className="set-row-title">{t.issuer}</div>
                       <div className="set-row-sub">{t.account}</div>
                     </div>
+                    <button type="button" className="tk-edit" onClick={() => { stopCamera(); openEditToken(t.id); }}>
+                      Editar
+                    </button>
                     <button
                       type="button"
                       className="tk-remove"
