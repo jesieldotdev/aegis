@@ -4,9 +4,10 @@
  * e reenvia. Como remoto e local usam o MESMO envelope AES-GCM, o Drive nunca
  * vê texto claro.
  *
- * O envelope remoto pode ter sido cifrado com outra senha-mestra? Não — a
- * senha-mestra é a mesma conta; se a decifragem remota falhar, tratamos como
- * "remoto incompatível" e mantemos o local (sem sobrescrever cegamente).
+ * Se o remoto não decifra com a chave local (a senha-mestra foi trocada em
+ * outro dispositivo, ou é outro cofre na mesma conta), a sincronização é
+ * interrompida com RemoteKeyMismatchError — sobrescrever o Drive aqui
+ * desfaria a troca de senha feita no outro aparelho.
  */
 import {
   decryptWithKey,
@@ -30,11 +31,26 @@ function envelopeFrom(kdf: { salt: string; iterations: number }, iv: string, ct:
 
 export type SyncResult = { vault: Vault; changed: boolean };
 
+/** O cofre do Drive está cifrado com outra senha-mestra. */
+export class RemoteKeyMismatchError extends Error {
+  constructor(readonly remote: EncryptedEnvelope) {
+    super('A senha-mestra foi alterada em outro dispositivo');
+  }
+}
+
 /**
  * Sincroniza o cofre local com o Drive e retorna o cofre resultante (já
  * mesclado). `changed` indica se o merge alterou o estado local.
  */
-export async function syncWithDrive(local: Vault, ctx: SyncContext): Promise<SyncResult> {
+/**
+ * `rekey` (troca de senha-mestra): o merge usa a chave atual (`ctx`), mas o
+ * resultado sobe cifrado com a nova chave/salt.
+ */
+export async function syncWithDrive(
+  local: Vault,
+  ctx: SyncContext,
+  rekey?: Pick<SyncContext, 'key' | 'kdf'>,
+): Promise<SyncResult> {
   const remoteEnvelope = await downloadVault(ctx.token);
 
   let merged = normalizeVault(local);
@@ -44,8 +60,7 @@ export async function syncWithDrive(local: Vault, ctx: SyncContext): Promise<Syn
       const remote = normalizeVault(JSON.parse(plaintext) as Vault);
       merged = mergeVaults(merged, remote);
     } catch {
-      // Remoto cifrado com outra chave (senha-mestra diferente) — não dá para
-      // mesclar com segurança; sobrescrevemos com o local nesta conta.
+      throw new RemoteKeyMismatchError(remoteEnvelope);
     }
   }
 
@@ -54,8 +69,9 @@ export async function syncWithDrive(local: Vault, ctx: SyncContext): Promise<Syn
   const changed = mergedJson !== localJson;
 
   // Reenvia sempre que houver remoto inexistente/desatualizado ou merge novo
-  const { iv, ct } = await encryptWithKey(ctx.key, mergedJson);
-  await uploadVault(ctx.token, envelopeFrom(ctx.kdf, iv, ct));
+  const target = rekey ?? ctx;
+  const { iv, ct } = await encryptWithKey(target.key, mergedJson);
+  await uploadVault(ctx.token, envelopeFrom(target.kdf, iv, ct));
 
   return { vault: merged, changed };
 }

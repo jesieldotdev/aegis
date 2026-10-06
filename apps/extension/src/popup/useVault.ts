@@ -50,6 +50,13 @@ export type VaultController = {
   disconnect: () => void;
 };
 
+/** O cofre do Drive está cifrado com outra senha-mestra (trocada no PWA). */
+class RemoteKeyMismatchError extends Error {
+  constructor() {
+    super('A senha-mestra foi alterada — clique em atualizar e desbloqueie com a nova');
+  }
+}
+
 export function useVault(): VaultController {
   const [phase, setPhase] = useState<Phase>('loading');
   const [account, setAccount] = useState<GoogleAccount | null>(null);
@@ -174,8 +181,10 @@ export function useVault(): VaultController {
           const plaintext = await decryptWithKey(key, remote.iv, remote.ct);
           merged = mergeVaults(local, normalizeVault(JSON.parse(plaintext) as Vault));
         } catch {
-          // Remoto cifrado com outra senha-mestra: mantém o local (sem merge).
-          merged = local;
+          // Remoto cifrado com outra senha-mestra (trocada no PWA): não envia,
+          // senão a troca seria desfeita. O item fica só no local até o
+          // usuário desbloquear de novo com a senha nova.
+          throw new RemoteKeyMismatchError();
         }
       }
 
@@ -223,8 +232,9 @@ export function useVault(): VaultController {
         await setSessionVault(effective);
         setEnvelope(nextEnv);
         setVault(effective);
-      } catch {
+      } catch (err) {
         // Sem token/offline: o cofre local já está atualizado; sincroniza depois.
+        if (err instanceof RemoteKeyMismatchError) setError(err.message);
       }
       return true;
     },

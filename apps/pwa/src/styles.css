@@ -1487,6 +1487,16 @@ button {
   color: var(--text);
 }
 
+.mp-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--accent-tint);
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
 /* ===== Feedback de toque ===== */
 .icon-btn,
 .mini-btn,
