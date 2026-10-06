@@ -18,8 +18,10 @@ import {
   encryptWithKey,
   exportVault,
   generatePassword,
+  getLastBiometricError,
   importVault,
   isWebAuthnAvailable,
+  mergeVaults,
   noteKey,
   normalizeVault,
   randomSalt,
@@ -49,13 +51,15 @@ import {
 } from './storage';
 import {
   clearToken,
+  describeAuthError,
   downloadVault,
   fetchAccount,
   getAccessToken,
   getCachedToken,
   isGoogleConfigured,
+  preloadGis,
 } from './google';
-import { syncWithDrive } from './sync';
+import { RemoteKeyMismatchError, syncWithDrive } from './sync';
 
 export type Tab = 'vault' | '2fa' | 'notes' | 'gen' | 'settings';
 export type Folder = 'Todos' | 'Pessoal' | 'Trabalho' | 'Financeiro';
@@ -68,11 +72,20 @@ export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
 
 export type GoogleState = {
   configured: boolean;
+  /** Script do GIS já carregado — só então é seguro habilitar o botão de
+   *  login (clicar antes disso reabre o bug do popup fechando sozinho). */
+  ready: boolean;
   account: RememberedGoogle | null;
   status: SyncStatus;
   lastSync: number | null;
   error: string;
+  /** O cofre do Drive está cifrado com outra senha-mestra (trocada em outro
+   *  dispositivo) — a sincronização fica parada até adotar a nova senha. */
+  keyMismatch: boolean;
 };
+
+/** Tela de senha-mestra: trocar a senha, ou adotar a que foi trocada em outro dispositivo. */
+export type PasswordScreen = 'change' | 'adopt';
 
 type AppState = {
   phase: Phase;
@@ -90,6 +103,9 @@ type AppState = {
   /** Nota em edição: undefined = fechada, null = nova nota. */
   editingNoteId: string | null | undefined;
   addingToken: boolean;
+  /** Token 2FA em edição (null = nenhum). */
+  editingTokenId: string | null;
+  passwordScreen: PasswordScreen | null;
   folder: Folder;
   search: string;
   revealed: boolean;
@@ -110,6 +126,10 @@ type AppState = {
   closeEdit: () => void;
   openAddToken: () => void;
   closeAddToken: () => void;
+  openEditToken: (id: string) => void;
+  closeEditToken: () => void;
+  openPasswordScreen: (mode: PasswordScreen) => void;
+  closePasswordScreen: () => void;
   setFolder: (folder: Folder) => void;
   setSearch: (search: string) => void;
   toggleReveal: () => void;
@@ -117,6 +137,7 @@ type AppState = {
   saveCredential: (cred: Credential) => void;
   deleteCredential: (id: string) => void;
   addToken: (token: Omit<TotpToken, 'id' | 'updatedAt'>) => void;
+  updateToken: (token: TotpToken) => void;
   deleteToken: (id: string) => void;
 
   openNote: (id: string | null) => void;
@@ -140,6 +161,10 @@ type AppState = {
   syncNow: () => Promise<void>;
   /** Restaura um cofre existente do Drive (onboarding em novo dispositivo). */
   restoreFromGoogle: () => Promise<void>;
+  /** Troca a senha-mestra. Devolve uma mensagem de erro, ou null se deu certo. */
+  changeMasterPassword: (current: string, next: string) => Promise<string | null>;
+  /** Adota a senha-mestra trocada em outro dispositivo (cofre do Drive). */
+  adoptRemotePassword: (password: string) => Promise<string | null>;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -158,6 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [editingId, setEditingId] = useState<string | null | undefined>(undefined);
   const [editingNoteId, setEditingNoteId] = useState<string | null | undefined>(undefined);
   const [addingToken, setAddingToken] = useState(false);
+  const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
   const [folder, setFolder] = useState<Folder>('Todos');
   const [search, setSearch] = useState('');
   const [revealed, setRevealed] = useState(false);
@@ -166,11 +192,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState('');
   const [google, setGoogle] = useState<GoogleState>({
     configured: isGoogleConfigured(),
+    ready: false,
     account: null,
     status: 'idle',
     lastSync: null,
     error: '',
+    keyMismatch: false,
   });
+  const [passwordScreen, setPasswordScreen] = useState<PasswordScreen | null>(null);
 
   const keyRef = useRef<CryptoKey | null>(null);
   const kdfRef = useRef<{ salt: string; iterations: number } | null>(null);
@@ -187,6 +216,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBioReady(stored.bio && hasWrappedVaultKey() && isWebAuthnAvailable());
     setGoogle((g) => ({ ...g, account: loadGoogle() }));
     setPhase(envelope ? 'locked' : 'onboarding');
+  }, []);
+
+  // Carrega o script do Google Identity Services de antemão: se ele só
+  // começar a carregar no clique do botão "Entrar com Google", o popup de
+  // autorização abre fora do gesto do usuário e é fechado na hora. Os
+  // botões ficam desabilitados (google.ready) até isso terminar.
+  useEffect(() => {
+    if (!isGoogleConfigured()) return;
+    preloadGis()
+      .then(() => setGoogle((g) => ({ ...g, ready: true })))
+      .catch(() => {});
   }, []);
 
   const showToast = useCallback((msg: string) => {
@@ -258,11 +298,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await persist(merged);
         setVault(merged);
       }
-      setGoogle((g) => ({ ...g, status: 'synced', lastSync: Date.now(), error: '' }));
+      setGoogle((g) => ({ ...g, status: 'synced', lastSync: Date.now(), error: '', keyMismatch: false }));
       if (!silent && changed) showToast('Cofre sincronizado');
     } catch (err) {
-      setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
-      if (!silent) showToast('Falha na sincronização');
+      const keyMismatch = err instanceof RemoteKeyMismatchError;
+      setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message, keyMismatch }));
+      if (keyMismatch && !silent) setPasswordScreen('adopt');
+      else if (!silent) showToast('Falha na sincronização');
     }
     // showToast e persist são estáveis
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -380,6 +422,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEditingId(undefined);
     setEditingNoteId(undefined);
     setAddingToken(false);
+    setEditingTokenId(null);
+    setPasswordScreen(null);
     setRevealed(false);
     setBioReady(loadSettings().bio && hasWrappedVaultKey() && isWebAuthnAvailable());
   }, []);
@@ -420,6 +464,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const closeNote = useCallback(() => setEditingNoteId(undefined), []);
   const openAddToken = useCallback(() => setAddingToken(true), []);
   const closeAddToken = useCallback(() => setAddingToken(false), []);
+  const openEditToken = useCallback((id: string) => setEditingTokenId(id), []);
+  const closeEditToken = useCallback(() => setEditingTokenId(null), []);
+  const openPasswordScreen = useCallback((mode: PasswordScreen) => setPasswordScreen(mode), []);
+  const closePasswordScreen = useCallback(() => setPasswordScreen(null), []);
   const toggleReveal = useCallback(() => setRevealed((r) => !r), []);
 
   // ---------- CRUD ----------
@@ -471,6 +519,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [mutateVault, showToast],
   );
 
+  const updateToken = useCallback(
+    (token: TotpToken) => {
+      const now = Date.now();
+      mutateVault((v) => ({
+        ...v,
+        tokens: v.tokens.map((t) => (t.id === token.id ? { ...token, updatedAt: now } : t)),
+        updatedAt: now,
+      }));
+      setEditingTokenId(null);
+      showToast('Token salvo');
+    },
+    [mutateVault, showToast],
+  );
+
   const deleteToken = useCallback(
     (id: string) => {
       const now = Date.now();
@@ -480,6 +542,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         tombstones: { ...v.tombstones, [tokenKey(id)]: now },
         updatedAt: now,
       }));
+      setEditingTokenId(null);
       showToast('Token removido');
     },
     [mutateVault, showToast],
@@ -549,7 +612,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const registered = await registerBiometric(vault.profile.name);
       if (!registered) {
+        const detail = getLastBiometricError();
         showToast('Não foi possível registrar a biometria');
+        // Toast some sozinho rápido demais pra copiar um erro técnico, e
+        // nem todo celular tem acesso fácil ao console remoto — um alert
+        // garante que dá pra ler (e reportar) a mensagem completa.
+        if (detail) window.alert(`Biometria falhou:\n${detail}`);
         return;
       }
       await storeWrappedVaultKey(keyRef.current);
@@ -648,7 +716,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showToast(`Conectado como ${account.email}`);
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
-      showToast('Não foi possível conectar ao Google');
+      showToast(describeAuthError(err));
     }
   }, [runSync, showToast]);
 
@@ -656,7 +724,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearToken();
     saveGoogle(null);
     clearTimeout(syncTimer.current);
-    setGoogle((g) => ({ ...g, account: null, status: 'idle', lastSync: null, error: '' }));
+    setGoogle((g) => ({ ...g, account: null, status: 'idle', lastSync: null, error: '', keyMismatch: false }));
     showToast('Google desconectado');
   }, [showToast]);
 
@@ -691,35 +759,146 @@ export function AppProvider({ children }: { children: ReactNode }) {
       showToast('Cofre encontrado — digite a senha-mestra');
     } catch (err) {
       setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message }));
-      showToast('Não foi possível conectar ao Google');
+      showToast(describeAuthError(err));
     }
   }, [showToast]);
+
+  // ---------- Senha-mestra ----------
+
+  /**
+   * Passa a usar `key`/`kdf` como chave do cofre: regrava o envelope local e,
+   * com a biometria ligada, re-embrulha a chave (a antiga não abre mais nada).
+   */
+  const applyNewKey = useCallback(
+    async (key: CryptoKey, kdf: { salt: string; iterations: number }, nextVault: Vault) => {
+      keyRef.current = key;
+      kdfRef.current = kdf;
+      await persist(nextVault);
+      setVault(nextVault);
+      if (loadSettings().bio && hasWrappedVaultKey()) await storeWrappedVaultKey(key);
+    },
+    [persist],
+  );
+
+  /** Token do Drive sem abrir janela (cache ou renovação silenciosa). */
+  const silentDriveToken = useCallback(async (): Promise<string | null> => {
+    const account = loadGoogle();
+    if (!account || !isGoogleConfigured()) return null;
+    try {
+      return getCachedToken() ?? (await getAccessToken(false, account.email));
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const changeMasterPassword = useCallback(
+    async (current: string, next: string): Promise<string | null> => {
+      const oldKdf = kdfRef.current;
+      const envelope = loadVaultEnvelope();
+      const local = vaultRef.current;
+      if (!oldKdf || !envelope || !local) return 'Cofre bloqueado';
+      let oldKey: CryptoKey;
+      try {
+        oldKey = await deriveVaultKey(current, oldKdf.salt, oldKdf.iterations);
+        await decryptWithKey(oldKey, envelope.iv, envelope.ct);
+      } catch {
+        return 'Senha atual incorreta';
+      }
+
+      const kdf = { salt: randomSalt(), iterations: PBKDF2_ITERATIONS };
+      const key = await deriveVaultKey(next, kdf.salt, kdf.iterations);
+      // Um push agendado com a chave antiga não pode correr depois deste.
+      clearTimeout(syncTimer.current);
+
+      let nextVault = local;
+      if (loadGoogle() && isGoogleConfigured()) {
+        // Com Drive conectado, a troca só vale se o Drive também for
+        // re-cifrado — senão os outros dispositivos continuariam com a
+        // senha antiga. Mescla com a chave antiga e sobe com a nova.
+        const token = await silentDriveToken();
+        if (!token) return 'Sem acesso ao Google Drive — toque em "Sincronizar agora" e tente de novo';
+        try {
+          setGoogle((g) => ({ ...g, status: 'syncing', error: '' }));
+          ({ vault: nextVault } = await syncWithDrive(local, { token, key: oldKey, kdf: oldKdf }, { key, kdf }));
+          setGoogle((g) => ({ ...g, status: 'synced', lastSync: Date.now(), error: '', keyMismatch: false }));
+        } catch (err) {
+          const keyMismatch = err instanceof RemoteKeyMismatchError;
+          setGoogle((g) => ({ ...g, status: 'error', error: (err as Error).message, keyMismatch }));
+          return keyMismatch
+            ? 'A senha-mestra já foi alterada em outro dispositivo — atualize-a primeiro'
+            : 'Falha ao atualizar o Google Drive — tente de novo';
+        }
+      }
+
+      await applyNewKey(key, kdf, nextVault);
+      setPasswordScreen(null);
+      showToast('Senha-mestra alterada');
+      return null;
+    },
+    [applyNewKey, silentDriveToken, showToast],
+  );
+
+  const adoptRemotePassword = useCallback(
+    async (password: string): Promise<string | null> => {
+      const local = vaultRef.current;
+      if (!local) return 'Cofre bloqueado';
+      const token = await silentDriveToken();
+      if (!token) return 'Sem acesso ao Google Drive — tente de novo';
+      let remoteVault: Vault;
+      let key: CryptoKey;
+      let kdf: { salt: string; iterations: number };
+      try {
+        const remote = await downloadVault(token);
+        if (!remote) return 'Nenhum cofre no Drive desta conta';
+        kdf = { salt: remote.salt, iterations: remote.iterations };
+        key = await deriveVaultKey(password, kdf.salt, kdf.iterations);
+        remoteVault = normalizeVault(JSON.parse(await decryptWithKey(key, remote.iv, remote.ct)) as Vault);
+      } catch {
+        return 'Senha-mestra incorreta';
+      }
+      // Mantém o que só existia aqui e reenvia já com a chave nova.
+      const merged = mergeVaults(normalizeVault(local), remoteVault);
+      try {
+        await syncWithDrive(merged, { token, key, kdf });
+      } catch {
+        // O local já fica com a chave nova; o próximo sync envia o merge.
+      }
+      await applyNewKey(key, kdf, merged);
+      setGoogle((g) => ({ ...g, status: 'synced', lastSync: Date.now(), error: '', keyMismatch: false }));
+      setPasswordScreen(null);
+      showToast('Senha-mestra atualizada');
+      return null;
+    },
+    [applyNewKey, silentDriveToken, showToast],
+  );
 
   const value = useMemo<AppState>(
     () => ({
       phase, vault, settings, google, bioReady, scanning, unlockError,
-      tab, detailId, editingId, editingNoteId, addingToken, folder, search, revealed,
+      tab, detailId, editingId, editingNoteId, addingToken, editingTokenId, passwordScreen, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
       clearUnlockError: () => setUnlockError(''),
-      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
+      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken, openEditToken, closeEditToken, openPasswordScreen, closePasswordScreen,
       setFolder, setSearch, toggleReveal,
-      saveCredential, deleteCredential, addToken, deleteToken,
+      saveCredential, deleteCredential, addToken, updateToken, deleteToken,
       openNote, closeNote, saveNote, deleteNote,
       setGenOpts, regen,
       setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
       connectGoogle, disconnectGoogle, syncNow, restoreFromGoogle,
+      changeMasterPassword, adoptRemotePassword,
     }),
     [
       phase, vault, settings, google, bioReady, scanning, unlockError,
-      tab, detailId, editingId, editingNoteId, addingToken, folder, search, revealed,
+      tab, detailId, editingId, editingNoteId, addingToken, editingTokenId, passwordScreen, folder, search, revealed,
       genOpts, genPass, toast,
       createVault, unlockWithPassword, unlockWithBiometric, lock,
-      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken,
-      toggleReveal, saveCredential, deleteCredential, addToken, deleteToken,
+      setTab, openDetail, back, openEdit, closeEdit, openAddToken, closeAddToken, openEditToken, closeEditToken, openPasswordScreen, closePasswordScreen,
+      toggleReveal, saveCredential, deleteCredential, addToken, updateToken, deleteToken,
       openNote, closeNote, saveNote, deleteNote,
       setGenOpts, regen, setBio, toggleBackup, cycleAutoLock, copy, share, doExport, importBackup,
       connectGoogle, disconnectGoogle, syncNow, restoreFromGoogle,
+      changeMasterPassword, adoptRemotePassword,
     ],
   );
 

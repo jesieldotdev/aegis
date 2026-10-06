@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="index, follow" />
+<title>Extensão Aegis para Chrome</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(120% 60% at 50% -8%, #1a1330 0%, transparent 46%), #0a0a11;
+    color: #e9e9f0;
+    font-family: 'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 22px 80px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 13px;
+    background: linear-gradient(145deg, #a78bfa, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.4);
+  }
+  .brand b { font-size: 19px; font-weight: 800; letter-spacing: -0.3px; }
+  h1 { font-size: 28px; letter-spacing: -0.5px; margin: 0 0 6px; }
+  .meta { color: #8b8b9c; font-size: 14px; margin-bottom: 34px; }
+  h2 { font-size: 18px; margin: 34px 0 10px; color: #c9bfff; }
+  p, li { color: #c4c4d2; font-size: 15.5px; }
+  a { color: #a78bfa; }
+  ul, ol { padding-left: 20px; }
+  li { margin: 8px 0; }
+  .card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px; padding: 16px 18px; margin: 18px 0;
+  }
+  .card strong { color: #e9e9f0; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: linear-gradient(145deg, #a78bfa, #7c3aed);
+    color: #fff; text-decoration: none; font-weight: 700; font-size: 15.5px;
+    padding: 13px 22px; border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.35);
+  }
+  .btn:active { transform: translateY(1px); }
+  code {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 5px; padding: 1px 6px; font-size: 14px;
+  }
+  footer { margin-top: 44px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); color: #6a6a7a; font-size: 13.5px; }
+  footer a { color: #8b8b9c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <span class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2.5l7 3v5.5c0 4.6-3 8.4-7 9.9-4-1.5-7-5.3-7-9.9V5.5l7-3z" fill="#fff" fill-opacity=".18" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M9 11.8l2.1 2.1L15.2 9.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <b>Aegis</b>
+  </div>
+
+  <h1>Extensão para Chrome</h1>
+  <div class="meta">Ainda não publicada na Chrome Web Store — instalação manual</div>
+
+  <p>A extensão Aegis preenche automaticamente suas senhas e códigos 2FA direto no navegador, usando o mesmo cofre cifrado do app. Enquanto ela não está na Web Store, você pode instalá-la manualmente em poucos passos.</p>
+
+  <p>
+    <a class="btn" href="/extension/aegis-extension.zip" download>
+      ⬇ Baixar extensão (.zip)
+    </a>
+  </p>
+
+  <h2>Como instalar</h2>
+  <div class="card">
+    <ol>
+      <li>Baixe o arquivo acima e <strong>extraia o .zip</strong> em uma pasta permanente no seu computador (não apague depois — o Chrome lê os arquivos direto dali).</li>
+      <li>No Chrome, acesse <code>chrome://extensions</code>.</li>
+      <li>Ative o <strong>Modo do desenvolvedor</strong> no canto superior direito.</li>
+      <li>Clique em <strong>Carregar sem compactação</strong>.</li>
+      <li>Selecione a pasta que você extraiu.</li>
+    </ol>
+  </div>
+
+  <p>Pronto — o ícone da Aegis aparece na barra de extensões. Para atualizar no futuro, baixe a nova versão, substitua os arquivos na mesma pasta e clique em "Recarregar" no card da extensão em <code>chrome://extensions</code>.</p>
+
+  <footer>
+    Aegis · <a href="/privacidade">Privacidade</a> · <a href="/termos">Termos</a>
+  </footer>
+</div>
+</body>
+</html>

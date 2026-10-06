@@ -8,11 +8,11 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @aegis/pwa",
-    "dev:pwa": "npm run dev --workspace @aegis/pwa",
-    "build": "npm run build --workspace @aegis/pwa && npm run build --workspace @aegis/extension",
-    "build:pwa": "npm run build --workspace @aegis/pwa",
-    "build:extension": "npm run build --workspace @aegis/extension",
+    "dev": "cd apps/pwa && vite",
+    "dev:pwa": "cd apps/pwa && vite",
+    "build": "(cd apps/pwa && tsc -b && vite build) && (cd apps/extension && tsc -b && vite build && vite build --config vite.content.config.ts && vite build --config vite.background.config.ts)",
+    "build:pwa": "cd apps/pwa && tsc -b && vite build",
+    "build:extension": "cd apps/extension && tsc -b && vite build && vite build --config vite.content.config.ts && vite build --config vite.background.config.ts",
     "typecheck": "tsc -b apps/pwa apps/extension"
   },
   "devDependencies": {

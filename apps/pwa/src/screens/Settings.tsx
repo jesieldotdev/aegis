@@ -6,6 +6,7 @@ import {
   IconDownload,
   IconFingerprint,
   IconGoogle,
+  IconKey,
   IconPadlock,
   IconRefresh,
   Toggle,
@@ -31,7 +32,7 @@ export function Settings() {
   const {
     vault, settings, google,
     setBio, toggleBackup, cycleAutoLock, doExport, importBackup, lock,
-    connectGoogle, disconnectGoogle, syncNow,
+    connectGoogle, disconnectGoogle, syncNow, openPasswordScreen,
   } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   if (!vault) return null;
@@ -84,6 +85,18 @@ export function Settings() {
           <div className="set-group">
             {google.account ? (
               <>
+                {google.keyMismatch && (
+                  <div className="set-row set-row--click" onClick={() => openPasswordScreen('adopt')}>
+                    <div className="set-row-icon" style={{ background: 'rgba(251,113,133,.14)', color: 'var(--danger)' }}>
+                      <IconKey size={18} />
+                    </div>
+                    <div className="set-row-body">
+                      <div className="set-row-title">Senha-mestra alterada</div>
+                      <div className="set-row-sub set-row-sub--danger">Toque para usar a nova senha neste aparelho</div>
+                    </div>
+                    <IconChevronRight size={17} style={{ color: '#54546a' }} />
+                  </div>
+                )}
                 <div className={`set-row set-row--click${google.status === 'syncing' ? ' set-row--busy' : ''}`} onClick={() => void syncNow()}>
                   <div className="set-row-icon" style={{ background: 'rgba(139,92,246,.16)', color: 'var(--accent)' }}>
                     <IconRefresh size={18} />
@@ -108,14 +121,22 @@ export function Settings() {
                 </div>
               </>
             ) : (
-              <div className="set-row set-row--click" onClick={() => void connectGoogle()}>
+              <div
+                className="set-row set-row--click"
+                onClick={google.ready ? () => void connectGoogle() : undefined}
+                style={google.ready ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+              >
                 <div className="set-row-icon" style={{ background: 'rgba(66,133,244,.16)' }}>
                   <IconGoogle size={18} />
                 </div>
                 <div className="set-row-body">
                   <div className="set-row-title">Conectar com Google</div>
                   <div className="set-row-sub">
-                    {google.configured ? 'Cofre cifrado no seu Google Drive' : 'Requer VITE_GOOGLE_CLIENT_ID'}
+                    {!google.configured
+                      ? 'Requer VITE_GOOGLE_CLIENT_ID'
+                      : google.ready
+                        ? 'Cofre cifrado no seu Google Drive'
+                        : 'Preparando…'}
                   </div>
                 </div>
                 <IconChevronRight size={17} style={{ color: '#54546a' }} />
@@ -127,6 +148,16 @@ export function Settings() {
         <div>
           <div className="set-section-title">Segurança</div>
           <div className="set-group">
+            <div className="set-row set-row--click" onClick={() => openPasswordScreen('change')}>
+              <div className="set-row-icon" style={{ background: 'rgba(139,92,246,.16)', color: 'var(--accent)' }}>
+                <IconKey size={18} />
+              </div>
+              <div className="set-row-body">
+                <div className="set-row-title">Alterar senha-mestra</div>
+                <div className="set-row-sub">Re-cifra o cofre com uma nova senha</div>
+              </div>
+              <IconChevronRight size={17} style={{ color: '#54546a' }} />
+            </div>
             <div className="set-row">
               <div className="set-row-icon" style={{ background: 'rgba(52,211,153,.16)', color: 'var(--success)' }}>
                 <IconFingerprint size={18} strokeWidth={1.7} />
@@ -193,6 +224,22 @@ export function Settings() {
                 style={{ display: 'none' }}
                 onChange={(e) => void onImportFile(e.target.files?.[0])}
               />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div className="set-section-title">Navegador</div>
+          <div className="set-group">
+            <div className="set-row set-row--click" onClick={() => window.open('/extension', '_blank', 'noopener')}>
+              <div className="set-row-icon" style={{ background: 'rgba(139,92,246,.16)', color: 'var(--accent)' }}>
+                <IconDownload size={18} />
+              </div>
+              <div className="set-row-body">
+                <div className="set-row-title">Extensão para Chrome</div>
+                <div className="set-row-sub">Baixar e instalar o Aegis no navegador</div>
+              </div>
+              <IconChevronRight size={17} style={{ color: '#54546a' }} />
             </div>
           </div>
         </div>

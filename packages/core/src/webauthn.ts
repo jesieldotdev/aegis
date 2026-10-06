@@ -12,8 +12,33 @@
 
 const CREDENTIAL_ID_KEY = 'aegis.webauthn.credentialId';
 
+// Guarda o último erro do WebAuthn pra exibir na UI — em celular sem acesso
+// fácil ao console remoto, isso é o único jeito prático de saber por que
+// "registrar biometria" falhou (o navegador não mostra nada sozinho).
+let lastError: string | null = null;
+
+export function getLastBiometricError(): string | null {
+  return lastError;
+}
+
+function describeWebAuthnError(err: unknown): string {
+  if (err instanceof DOMException) return `${err.name}: ${err.message}`;
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 export function isWebAuthnAvailable(): boolean {
-  return typeof window !== 'undefined' && !!window.PublicKeyCredential && !!navigator.credentials;
+  // isSecureContext é essencial: fora de HTTPS (ou localhost), o Chrome
+  // ainda expõe window.PublicKeyCredential, mas navigator.credentials.create
+  // rejeita toda chamada — sem isso aqui o app mostrava "não foi possível
+  // registrar" em vez do "biometria não disponível" (mais correto), e
+  // escondia que a causa é acessar o app por HTTP/IP local em vez de HTTPS.
+  return (
+    typeof window !== 'undefined' &&
+    window.isSecureContext &&
+    !!window.PublicKeyCredential &&
+    !!navigator.credentials
+  );
 }
 
 export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
@@ -69,8 +94,11 @@ export async function registerBiometric(userName: string): Promise<boolean> {
     })) as PublicKeyCredential | null;
     if (!credential) return false;
     localStorage.setItem(CREDENTIAL_ID_KEY, toBase64Url(credential.rawId));
+    lastError = null;
     return true;
-  } catch {
+  } catch (err) {
+    lastError = describeWebAuthnError(err);
+    console.error('[Aegis] registerBiometric falhou:', err);
     return false;
   }
 }
@@ -92,8 +120,11 @@ export async function verifyBiometric(userName: string): Promise<boolean> {
         timeout: 60_000,
       },
     });
+    lastError = null;
     return !!assertion;
-  } catch {
+  } catch (err) {
+    lastError = describeWebAuthnError(err);
+    console.error('[Aegis] verifyBiometric falhou:', err);
     return false;
   }
 }
